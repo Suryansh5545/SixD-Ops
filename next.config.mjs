@@ -1,16 +1,11 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  // Enable React strict mode for better development warnings
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
 
-  // Allow images from local uploads and any configured domains
   images: {
     remotePatterns: [],
-    // Local uploads served via /api/uploads/[...path]
   },
 
-  // Security headers
   async headers() {
     return [
       {
@@ -25,15 +20,12 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Experimental features
   experimental: {
-    // Server actions for form submissions
     serverActions: {
       allowedOrigins: ["localhost:3000"],
     },
   },
 
-  // Webpack configuration for PDF renderer
   webpack: (config) => {
     config.resolve.alias.canvas = false;
     return config;

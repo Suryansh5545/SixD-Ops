@@ -3,12 +3,12 @@
  *
  * Runs on every matched request before it reaches the route handler.
  * Responsibilities:
- *   1. Protect all (dashboard) routes — redirect to /login if unauthenticated
- *   2. Rate limit authentication endpoints (10 req/min per IP)
- *   3. Redirect authenticated users away from /login to their dashboard
+ *   1. Rate limit authentication endpoints (10 req/min per IP)
+ *
+ * Page auth and redirects are handled client-side to keep the UI out of the
+ * Edge runtime and avoid server-side rendering/session checks for app pages.
  */
 
-import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -35,10 +35,8 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
-export default auth((req: NextRequest & { auth: unknown }) => {
+export default function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const session = (req as { auth?: { user?: unknown } }).auth;
-  const isAuthenticated = !!session?.user;
 
   // Rate limit /api/auth/* endpoints
   if (pathname.startsWith("/api/auth/")) {
@@ -55,31 +53,8 @@ export default auth((req: NextRequest & { auth: unknown }) => {
     }
   }
 
-  // Redirect authenticated users away from /login
-  if (pathname === "/login" && isAuthenticated) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
-  }
-
-  // Protect all dashboard and API routes (except auth)
-  const isProtected =
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/pos") ||
-    pathname.startsWith("/projects") ||
-    pathname.startsWith("/team") ||
-    pathname.startsWith("/invoices") ||
-    pathname.startsWith("/payments") ||
-    pathname.startsWith("/compliance") ||
-    pathname.startsWith("/settings") ||
-    (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth/"));
-
-  if (isProtected && !isAuthenticated) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [

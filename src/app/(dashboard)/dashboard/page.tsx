@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Root dashboard redirect page.
- * Redirects each role to their appropriate dashboard.
+ * Dashboard landing page.
+ * Redirects each role to the appropriate dashboard subpage.
  */
 
 import { useEffect } from "react";
@@ -23,7 +23,7 @@ const ROLE_DASHBOARD_MAP: Partial<Record<Role, string>> = {
   ACCOUNTS: "/invoices",
 };
 
-export default function DashboardRootPage() {
+export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, isAuthenticated } = useAuth();
 

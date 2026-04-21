@@ -11,23 +11,13 @@ interface StatCardProps {
   loading?: boolean;
 }
 
-const variantStyles = {
-  default: "bg-card border",
-  success: "bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800",
-  warning: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800",
-  danger: "bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800",
-};
-
 const iconStyles = {
-  default: "bg-brand-100 text-brand-600",
-  success: "bg-green-100 text-green-600",
-  warning: "bg-yellow-100 text-yellow-700",
-  danger: "bg-red-100 text-red-600",
+  default: "text-muted-foreground",
+  success: "text-emerald-600 dark:text-emerald-500",
+  warning: "text-amber-600 dark:text-amber-500",
+  danger: "text-rose-600 dark:text-rose-500",
 };
 
-/**
- * Stat card for dashboard overview widgets.
- */
 export function StatCard({
   title,
   value,
@@ -39,43 +29,52 @@ export function StatCard({
 }: StatCardProps) {
   if (loading) {
     return (
-      <div className="rounded-xl border p-5 space-y-3">
-        <div className="skeleton h-4 w-24 rounded" />
-        <div className="skeleton h-8 w-32 rounded" />
-        <div className="skeleton h-3 w-20 rounded" />
+      <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="skeleton h-4 w-24 rounded" />
+          <div className="skeleton h-5 w-5 rounded" />
+        </div>
+        <div className="mt-4 skeleton h-8 w-28 rounded-lg" />
+        <div className="mt-2 skeleton h-4 w-36 rounded" />
       </div>
     );
   }
 
   return (
-    <div className={cn("rounded-xl p-5 flex flex-col gap-3", variantStyles[variant])}>
-      <div className="flex items-start justify-between">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        {Icon && (
-          <div className={cn("p-2 rounded-lg", iconStyles[variant])}>
-            <Icon className="h-4 w-4" />
+    <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm transition-colors hover:border-foreground/20">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-medium tracking-tight text-muted-foreground">
+          {title}
+        </h3>
+        {Icon && <Icon className={cn("h-5 w-5 shrink-0", iconStyles[variant])} />}
+      </div>
+
+      <div className="mt-4 flex flex-col gap-1">
+        <p className="text-3xl font-semibold tracking-tight text-foreground">
+          {value}
+        </p>
+
+        {(subtitle || trend) && (
+          <div className="mt-1 flex items-center gap-2">
+            {trend && (
+              <span
+                className={cn(
+                  "inline-flex items-center text-sm font-medium",
+                  trend.value >= 0
+                    ? "text-emerald-600 dark:text-emerald-500"
+                    : "text-rose-600 dark:text-rose-500"
+                )}
+              >
+                {trend.value >= 0 ? "+" : ""}
+                {trend.value}%
+              </span>
+            )}
+            {subtitle && (
+              <p className="text-sm text-muted-foreground">{subtitle}</p>
+            )}
           </div>
         )}
       </div>
-
-      <div>
-        <p className="text-2xl font-bold text-foreground">{value}</p>
-        {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
-      </div>
-
-      {trend && (
-        <div className="flex items-center gap-1">
-          <span
-            className={cn(
-              "text-xs font-medium",
-              trend.value >= 0 ? "text-green-600" : "text-red-600"
-            )}
-          >
-            {trend.value >= 0 ? "+" : ""}{trend.value}%
-          </span>
-          <span className="text-xs text-muted-foreground">{trend.label}</span>
-        </div>
-      )}
     </div>
   );
 }

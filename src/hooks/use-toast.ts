@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 
 export interface Toast {
   id: string;
@@ -38,15 +38,14 @@ export function toast(opts: Omit<Toast, "id">) {
 export function useToast() {
   const [currentToasts, setCurrentToasts] = useState<Toast[]>(toasts);
 
-  const addListener = useCallback(() => {
+  useEffect(() => {
     const handler = (updated: Toast[]) => setCurrentToasts([...updated]);
     listeners.push(handler);
+
     return () => {
       listeners = listeners.filter((l) => l !== handler);
     };
   }, []);
-
-  useState(addListener);
 
   return {
     toasts: currentToasts,
