@@ -1,0 +1,633 @@
+// SixD Engineering Solutions — Operations Management Tool
+// Prisma Schema v1.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  MD
+  CFO
+  BUSINESS_HEAD
+  BUSINESS_MANAGER_STEEL
+  BUSINESS_MANAGER_TATA_GOVT
+  BD_TEAM
+  PROJECT_MANAGER
+  FIELD_ENGINEER
+  ADMIN_COORDINATOR
+  ACCOUNTS
+}
+
+enum Division {
+  TS   // Technical Services
+  LSS  // Laser Scanning & Survey
+}
+
+enum EngineerLevel {
+  HEAD
+  LEADER
+  FIELD
+}
+
+enum DocumentType {
+  PURCHASE_ORDER
+  CONTRACT
+  JPO
+  SERVICE_ORDER
+  LOA
+  LOI
+}
+
+enum InvoiceType {
+  SINGLE
+  MULTIPLE
+  ARC
+}
+
+enum InvoiceBillingLine {
+  PROFESSIONAL_FEES
+  EXTRA_HOURS
+  STANDBY_CHARGES
+  TRAVEL
+  DAILY_ALLOWANCE
+  EQUIPMENT_MOBILISATION
+  MISCELLANEOUS
+}
+
+enum ProjectStatus {
+  PO_RECEIVED
+  PO_MAPPED
+  CLIENT_CONFIRMATION_PENDING
+  PLANNING_TEAM
+  PLANNING_TRAVEL
+  MOBILISED_IN_TRANSIT
+  ON_SITE_ACTIVE
+  ON_SITE_BLOCKED
+  WORK_COMPLETED
+  MOM_CREATED
+  REPORT_SUBMITTED
+  EXPENSES_RECEIVED
+  INVOICE_INITIATED
+  INVOICE_UNDER_REVIEW
+  INVOICE_SENT
+  PAYMENT_PENDING
+  PARTIALLY_PAID
+  PAYMENT_RECEIVED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  SENT
+  PARTIALLY_PAID
+  PAID
+}
+
+enum DailyStatus {
+  TRAVELLING_TO_SITE
+  SITE_WAITING
+  WORKING_ON_JOB
+  TRAVELLING_BACK
+  RESTING_AT_HOME
+  ON_LEAVE
+  STANDBY_BLOCKED
+}
+
+enum ExpenseCategory {
+  TRAVEL_FLIGHT
+  TRAVEL_TRAIN
+  TRAVEL_CAB
+  HOTEL
+  DAILY_ALLOWANCE
+  EQUIPMENT_MOBILISATION
+  STANDBY_CHARGES
+  EXTRA_HOURS
+  MISCELLANEOUS
+}
+
+enum PaymentTerms {
+  NET_30
+  NET_45
+  CUSTOM
+}
+
+enum IndustrySector {
+  STEEL
+  POWER
+  CEMENT
+  HYDROPOWER
+  DEFENCE
+  OIL_AND_GAS
+}
+
+enum DeploymentStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+enum ComplianceDocStatus {
+  VALID
+  EXPIRING_SOON
+  EXPIRED
+  PENDING
+}
+
+enum ReminderChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  SKIPPED
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CORE MODELS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String?
+  pin          String?  // 6-digit PIN hashed with bcrypt (for field engineers)
+  role         Role     // Primary role
+  roles        Role[]   // All roles (supports dual-role users like Syed Ali)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  engineer              Engineer?
+  assignedPOs           PurchaseOrder[]      @relation("AssignedPM")
+  createdPOs            PurchaseOrder[]      @relation("CreatedBy")
+  managedProjects       Project[]            @relation("ProjectPM")
+  createdMOMs           MOM[]
+  submittedReports      Report[]
+  createdInvoices       Invoice[]            @relation("InvoiceCreatedBy")
+  reviewedInvoices      Invoice[]            @relation("InvoiceReviewedBy")
+  recordedPayments      Payment[]
+  uploadedCompliance    ComplianceDocument[]
+  uploadedDocs          ProjectDocument[]
+  uploadedProjectDocs   ProjectComplianceDoc[] @relation("ProjectComplianceDocUploader")
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+
+  @@index([role])
+  @@index([email])
+}
+
+model Engineer {
+  id               String       @id @default(cuid())
+  userId           String       @unique
+  user             User         @relation(fields: [userId], references: [id])
+  division         Division
+  level            EngineerLevel
+  currentStatus    DailyStatus?
+  currentProjectId String?
+
+  // Relations
+  deployments      Deployment[]
+  logSheetEntries  LogSheetEntry[]
+  expenseClaims    ExpenseClaim[]
+
+  @@index([division])
+  @@index([level])
+}
+
+model Client {
+  id                    String         @id @default(cuid())
+  name                  String         @unique
+  sector                IndustrySector
+  paymentTermsDefault   PaymentTerms   @default(NET_30)
+  gstPercent            Float          @default(18.0) // Per-client configurable GST rate
+  portalType            String?        // e.g. "JSW SAP", "TATA Vendor Portal"
+  gstNumber             String?
+  address               String?
+  contactPerson         String?
+  contactEmail          String?
+  contactPhone          String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  // Relations
+  purchaseOrders        PurchaseOrder[]
+  projects              Project[]
+  complianceDocuments   ComplianceDocument[]
+  complianceChecklists  ClientComplianceRequirement[]
+
+  @@index([sector])
+}
+
+model Equipment {
+  id               String    @id @default(cuid())
+  name             String
+  serialNumber     String    @unique
+  division         Division
+  isAvailable      Boolean   @default(true)
+  currentProjectId String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+
+  // Relations
+  deployments      Deployment[]
+
+  @@index([division])
+  @@index([isAvailable])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PO & PROJECT
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PurchaseOrder {
+  id                  String       @id @default(cuid())
+  internalId          String       @unique // SXD-PO-YYYY-NNNN
+  clientId            String
+  client              Client       @relation(fields: [clientId], references: [id])
+  documentType        DocumentType
+  referenceNumber     String       @unique
+  amount              Decimal      @db.Decimal(15, 2)
+  expiryDate          DateTime     @db.Date
+  expectedWorkingDays Int
+  paymentTerms        PaymentTerms @default(NET_30)
+  customPaymentDays   Int?         // Used when paymentTerms = CUSTOM
+  invoiceType         InvoiceType
+  assignedPMId        String
+  assignedPM          User         @relation("AssignedPM", fields: [assignedPMId], references: [id])
+  workStartDate       DateTime?    @db.Date
+  notes               String?
+  remainingValue      Decimal      @db.Decimal(15, 2) // Auto-updated: poAmount - sum(invoice totals)
+  createdById         String
+  createdBy           User         @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relations
+  projects            Project[]
+  invoices            Invoice[]
+
+  @@index([clientId])
+  @@index([assignedPMId])
+  @@index([expiryDate])
+}
+
+model Project {
+  id                 String        @id @default(cuid())
+  poId               String
+  po                 PurchaseOrder @relation(fields: [poId], references: [id])
+  clientId           String
+  client             Client        @relation(fields: [clientId], references: [id])
+  name               String
+  description        String?
+  status             ProjectStatus @default(PO_RECEIVED)
+  division           Division?
+  pmId               String
+  pm                 User          @relation("ProjectPM", fields: [pmId], references: [id])
+  startDate          DateTime?     @db.Date
+  endDate            DateTime?     @db.Date
+  daysAuthorised     Int
+  daysConsumed       Int           @default(0) // Auto-calculated from log sheets
+  isBlocked          Boolean       @default(false)
+  blockedSince       DateTime?
+  standbyHoursTotal  Float         @default(0)
+  siteLocation       String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  // Relations
+  deployments        Deployment[]
+  logSheetEntries    LogSheetEntry[]
+  expenseClaims      ExpenseClaim[]
+  moms               MOM[]
+  reports            Report[]
+  invoices           Invoice[]
+  documents          ProjectDocument[]
+  complianceDocs     ProjectComplianceDoc[]
+  auditLogs          AuditLog[]       @relation("ProjectAuditLogs")
+
+  @@index([poId])
+  @@index([clientId])
+  @@index([pmId])
+  @@index([status])
+}
+
+model Deployment {
+  id           String           @id @default(cuid())
+  projectId    String
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engineerId   String
+  engineer     Engineer         @relation(fields: [engineerId], references: [id])
+  role         String           // e.g. "Team Leader", "Field Engineer"
+  startDate    DateTime         @db.Date
+  endDate      DateTime?        @db.Date
+  equipmentId  String?
+  equipment    Equipment?       @relation(fields: [equipmentId], references: [id])
+  status       DeploymentStatus @default(PLANNED)
+  createdAt    DateTime         @default(now())
+
+  @@index([projectId])
+  @@index([engineerId])
+  @@index([startDate])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FIELD EXECUTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+model LogSheetEntry {
+  id                       String      @id @default(cuid())
+  projectId                String
+  project                  Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engineerId               String
+  engineer                 Engineer    @relation(fields: [engineerId], references: [id])
+  date                     DateTime    @db.Date
+  clockIn                  DateTime?   // UTC; display in IST
+  clockOut                 DateTime?   // UTC; display in IST
+  totalHours               Float       @default(0) // Auto-calc: clockOut - clockIn in hours
+  extraHours               Float       @default(0) // Hours beyond standard 8-hour shift
+  dailyStatus              DailyStatus
+  progressRemarks          String?
+  reportStatus             String?     // Material Inspection / Site Not Ready / etc.
+  clientCountersignatureUrl String?
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+
+  @@unique([projectId, engineerId, date])
+  @@index([projectId])
+  @@index([engineerId])
+  @@index([date])
+}
+
+model ExpenseClaim {
+  id             String          @id @default(cuid())
+  projectId      String
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engineerId     String
+  engineer       Engineer        @relation(fields: [engineerId], references: [id])
+  category       ExpenseCategory
+  amount         Decimal         @db.Decimal(10, 2)
+  description    String?
+  receiptUrl     String?
+  approvedByPM   Boolean         @default(false)
+  rejectedByPM   Boolean         @default(false)
+  rejectionReason String?
+  approvedAt     DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([projectId])
+  @@index([engineerId])
+  @@index([approvedByPM])
+}
+
+model MOM {
+  id               String   @id @default(cuid())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  date             DateTime @db.Date
+  attendees        String[]
+  discussionPoints String
+  actionItems      String
+  fileUrl          String?
+  createdById      String
+  createdBy        User     @relation(fields: [createdById], references: [id])
+  createdAt        DateTime @default(now())
+
+  @@index([projectId])
+}
+
+model Report {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reportType     String
+  version        String
+  submittedById  String
+  submittedBy    User     @relation(fields: [submittedById], references: [id])
+  submissionDate DateTime @db.Date
+  fileUrl        String
+  createdAt      DateTime @default(now())
+
+  @@index([projectId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INVOICING & PAYMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id                   String        @id @default(cuid())
+  invoiceNumber        String        @unique // SXD-INV-YYYY-NNNN
+  projectId            String
+  project              Project       @relation(fields: [projectId], references: [id])
+  poId                 String
+  po                   PurchaseOrder @relation(fields: [poId], references: [id])
+  invoiceDate          DateTime      @db.Date
+  // lineItems stored as JSON array: [{description, quantity, rate, amount, type: InvoiceBillingLine}]
+  lineItems            Json
+  subtotal             Decimal       @db.Decimal(15, 2)
+  gstPercent           Float
+  gstAmount            Decimal       @db.Decimal(15, 2)
+  totalAmount          Decimal       @db.Decimal(15, 2)
+  status               InvoiceStatus @default(DRAFT)
+  sentDate             DateTime?
+  sentMethod           String?       // "EMAIL" | "PORTAL" | "BOTH"
+  workingSheetUrl      String?
+  dueDate              DateTime?     @db.Date
+  balanceDue           Decimal       @db.Decimal(15, 2) @default(0)
+  createdById          String
+  createdBy            User          @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  accountsReviewedById String?
+  accountsReviewedBy   User?         @relation("InvoiceReviewedBy", fields: [accountsReviewedById], references: [id])
+  reviewNotes          String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Relations
+  payments             Payment[]
+  reminders            PaymentReminder[]
+
+  @@index([projectId])
+  @@index([poId])
+  @@index([status])
+  @@index([invoiceDate])
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id])
+  amount          Decimal  @db.Decimal(15, 2)
+  paymentDate     DateTime @db.Date
+  referenceNumber String?
+  isPartial       Boolean  @default(false)
+  balanceAfter    Decimal  @db.Decimal(15, 2)
+  notes           String?
+  recordedById    String
+  recordedBy      User     @relation(fields: [recordedById], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model PaymentReminder {
+  id          String          @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice         @relation(fields: [invoiceId], references: [id])
+  scheduledAt DateTime
+  sentAt      DateTime?
+  channel     ReminderChannel @default(EMAIL)
+  draftBody   String
+  status      ReminderStatus  @default(PENDING)
+  dayOffset   Int             // +7, +14, +21, +30, +45 days after invoice sent
+  createdAt   DateTime        @default(now())
+
+  @@index([invoiceId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPLIANCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ComplianceDocType {
+  id                   String   @id @default(cuid())
+  name                 String   @unique
+  description          String?
+  renewalFrequencyDays Int?
+  isMandatory          Boolean  @default(true)
+  createdAt            DateTime @default(now())
+
+  // Relations
+  documents            ComplianceDocument[]
+  clientRequirements   ClientComplianceRequirement[]
+  projectDocs          ProjectComplianceDoc[]
+}
+
+/// Per-client configuration of which doc types are mandatory
+model ClientComplianceRequirement {
+  id           String            @id @default(cuid())
+  clientId     String
+  client       Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  docTypeId    String
+  docType      ComplianceDocType @relation(fields: [docTypeId], references: [id], onDelete: Cascade)
+  isMandatory  Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+
+  @@unique([clientId, docTypeId])
+}
+
+model ComplianceDocument {
+  id           String              @id @default(cuid())
+  clientId     String
+  client       Client              @relation(fields: [clientId], references: [id])
+  docTypeId    String
+  docType      ComplianceDocType   @relation(fields: [docTypeId], references: [id])
+  validFrom    DateTime            @db.Date
+  expiryDate   DateTime            @db.Date
+  fileUrl      String
+  uploadedById String
+  uploadedBy   User                @relation(fields: [uploadedById], references: [id])
+  status       ComplianceDocStatus @default(PENDING)
+  notes        String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([clientId])
+  @@index([docTypeId])
+  @@index([expiryDate])
+  @@index([status])
+}
+
+model ProjectDocument {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name         String
+  fileUrl      String
+  fileSize     Int?
+  mimeType     String?
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([projectId])
+}
+
+/// Per-project compliance checklist — tracks which docs are uploaded for a given project
+model ProjectComplianceDoc {
+  id           String              @id @default(cuid())
+  projectId    String
+  project      Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  docTypeId    String
+  docType      ComplianceDocType   @relation(fields: [docTypeId], references: [id])
+  fileUrl      String?
+  fileName     String?
+  expiryDate   DateTime?           @db.Date
+  status       ComplianceDocStatus @default(PENDING)
+  uploadedAt   DateTime?
+  uploadedById String?
+  uploadedBy   User?               @relation("ProjectComplianceDocUploader", fields: [uploadedById], references: [id])
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([projectId, docTypeId])
+  @@index([projectId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYSTEM
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  entityType    String   // "Project" | "Invoice" | "Payment" | "ComplianceDocument" | etc.
+  entityId      String
+  action        String   // "STATUS_CHANGED" | "CREATED" | "UPDATED" | "DELETED" | "APPROVED" | etc.
+  performedById String
+  performedBy   User     @relation(fields: [performedById], references: [id])
+  oldValue      Json?
+  newValue      Json?
+  description   String?  // Human-readable description of the change
+  timestamp     DateTime @default(now())
+
+  // Optional project relation for project-scoped audit views
+  projectId     String?
+  project       Project? @relation("ProjectAuditLogs", fields: [projectId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([performedById])
+  @@index([timestamp])
+  @@index([projectId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  link      String?  // Deep link to relevant entity
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
