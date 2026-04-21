@@ -143,6 +143,86 @@ class EmailServiceClass {
       `,
     });
   }
+
+  async sendTeamInvite(opts: {
+    to: string;
+    name: string;
+    division: string;
+    level: string;
+    loginUrl: string;
+    invitedBy: string;
+    temporaryPassword: string;
+    temporaryPin?: string;
+  }): Promise<boolean> {
+    return this.send({
+      to: opts.to,
+      subject: "You have been invited to join SixD Ops",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+          <div style="background: #E85122; padding: 24px 28px;">
+            <h1 style="margin: 0; color: #ffffff; font-size: 24px;">Welcome to SixD Ops</h1>
+            <p style="margin: 8px 0 0; color: #ffe4d8; font-size: 14px;">Your team access is ready.</p>
+          </div>
+          <div style="padding: 28px;">
+            <p style="margin-top: 0;">Hi ${opts.name},</p>
+            <p>You have been added to the SixD Engineering operations workspace by ${opts.invitedBy}.</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;">
+              <tr>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb; width: 35%;"><strong>Division</strong></td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${opts.division}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;"><strong>Level</strong></td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${opts.level}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;"><strong>Login Email</strong></td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${opts.to}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;"><strong>Temporary Password</strong></td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${opts.temporaryPassword}</td>
+              </tr>
+              ${
+                opts.temporaryPin
+                  ? `
+                    <tr>
+                      <td style="padding: 10px 12px; border: 1px solid #e5e7eb;"><strong>Temporary PIN</strong></td>
+                      <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${opts.temporaryPin}</td>
+                    </tr>
+                  `
+                  : ""
+              }
+            </table>
+            <p style="margin-bottom: 20px;">Use the link below to sign in and update your credentials after first login.</p>
+            <a
+              href="${opts.loginUrl}"
+              style="display: inline-block; padding: 12px 18px; background: #E85122; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;"
+            >
+              Open SixD Ops
+            </a>
+            <p style="margin: 24px 0 0; color: #6b7280; font-size: 12px;">
+              If you were not expecting this invitation, please contact your SixD administrator.
+            </p>
+          </div>
+        </div>
+      `,
+      text: [
+        `Hi ${opts.name},`,
+        "",
+        `You have been added to SixD Ops by ${opts.invitedBy}.`,
+        `Division: ${opts.division}`,
+        `Level: ${opts.level}`,
+        `Login Email: ${opts.to}`,
+        `Temporary Password: ${opts.temporaryPassword}`,
+        opts.temporaryPin ? `Temporary PIN: ${opts.temporaryPin}` : null,
+        "",
+        `Sign in here: ${opts.loginUrl}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    });
+  }
 }
 
 export const EmailService = new EmailServiceClass();

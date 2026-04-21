@@ -68,6 +68,7 @@ export type Permission =
   | "settings:manage"
   | "settings:view"
   // Team / Engineers
+  | "team:manage"
   | "team:view_all"
   | "team:view_own_division"
   // Audit
@@ -93,7 +94,7 @@ const RBAC_MATRIX: Record<Role, Permission[]> = {
     "notification:view_own",
     "dashboard:md", "dashboard:cfo", "dashboard:bh", "dashboard:pm",
     "settings:manage", "settings:view",
-    "team:view_all",
+    "team:manage", "team:view_all",
     "audit:view",
   ],
 
@@ -123,7 +124,7 @@ const RBAC_MATRIX: Record<Role, Permission[]> = {
     "notification:view_own",
     "dashboard:bh",
     "settings:view",
-    "team:view_all",
+    "team:manage", "team:view_all",
     "audit:view",
   ],
 
@@ -177,6 +178,7 @@ const RBAC_MATRIX: Record<Role, Permission[]> = {
 
   ADMIN_COORDINATOR: [
     "project:view_all",
+    "team:manage",
     "team:view_all",
     "notification:view_own",
     "settings:view",

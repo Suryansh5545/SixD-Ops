@@ -28,11 +28,18 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") ?? "20", 10);
     const clientId = searchParams.get("clientId");
     const search = searchParams.get("search");
+    const status = searchParams.get("status");
     const skip = (page - 1) * limit;
 
     const where = {
       ...(clientId ? { clientId } : {}),
       ...(!canViewAll ? { createdById: session.user.id } : {}),
+      ...(status === "ACTIVE"
+        ? {
+            expiryDate: { gte: new Date() },
+            remainingValue: { gt: 0 },
+          }
+        : {}),
       ...(search
         ? {
             OR: [

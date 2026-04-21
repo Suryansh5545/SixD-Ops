@@ -144,6 +144,10 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   }
 }
 
+export async function PATCH(req: NextRequest, context: RouteContext) {
+  return PUT(req, context);
+}
+
 // ─── STATUS UPDATE HANDLER ────────────────────────────────────────────────────
 
 async function handleStatusUpdate(

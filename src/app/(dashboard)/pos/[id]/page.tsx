@@ -1,174 +1,230 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, Plus, Calendar, DollarSign, FileText } from "lucide-react";
-import Link from "next/link";
-import { format } from "date-fns";
+import {
+  ArrowLeft,
+  Calendar,
+  ExternalLink,
+  FilePenLine,
+  FileText,
+  Plus,
+  Receipt,
+  UserCircle2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { formatINR } from "@/lib/utils/currency";
+import { formatINR, toNumber } from "@/lib/utils/currency";
+import { formatDate } from "@/lib/utils/date";
+import { parsePONotes } from "@/lib/po-notes";
+import { useAuth } from "@/hooks/useAuth";
 
-interface PO {
+interface PODetail {
   id: string;
-  poNumber: string;
-  clientId: string;
+  internalId: string;
+  referenceNumber: string;
+  documentType: string;
+  amount: number | string;
+  remainingValue: number | string;
+  expiryDate: string;
+  workStartDate?: string | null;
+  expectedWorkingDays: number;
+  paymentTerms: string;
+  customPaymentDays?: number | null;
+  invoiceType: string;
+  notes?: string | null;
+  createdAt: string;
   client: { name: string };
-  scope: string;
-  amount: number;
-  remainingValue: number;
-  currency: string;
-  startDate: string;
-  endDate: string;
-  division: "TS" | "LSS";
-  status: string;
-  notes?: string;
+  assignedPM?: { name: string; email: string } | null;
   projects: Array<{
     id: string;
-    projectId: string;
-    title: string;
+    name: string;
     status: string;
-    division: string;
+    daysConsumed: number;
+    daysAuthorised: number;
+    createdAt: string;
   }>;
-  createdAt: string;
+  invoices: Array<{
+    id: string;
+    invoiceNumber: string;
+    totalAmount: number | string;
+    status: string;
+    invoiceDate: string;
+  }>;
 }
-
-const STATUS_BADGE: Record<string, "success" | "warning" | "destructive" | "muted"> = {
-  ACTIVE: "success",
-  EXPIRING_SOON: "warning",
-  EXPIRED: "destructive",
-  COMPLETED: "muted",
-};
 
 export default function PODetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { can } = useAuth();
 
-  const { data: po, isLoading } = useQuery<PO>({
+  const { data: po, isLoading, isError } = useQuery<PODetail | null>({
     queryKey: ["po", id],
     queryFn: async () => {
-      const res = await fetch(`/api/pos/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch PO");
-      return res.json();
+      const res = await fetch(`/api/pos/${id}`, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success || !json?.data) return null;
+      return json.data as PODetail;
     },
   });
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-48 w-full" />
+      <div className="mx-auto max-w-4xl space-y-4">
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-56 w-full" />
       </div>
     );
   }
 
-  if (!po) {
+  if (isError || !po) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <p className="text-muted-foreground">PO not found.</p>
-        <Link href="/pos"><Button variant="outline">Back to POs</Button></Link>
+      <div className="flex flex-col items-center justify-center gap-4 py-24">
+        <p className="text-muted-foreground">PO details are unavailable right now.</p>
+        <Button asChild variant="outline">
+          <Link href="/pos">Back to Purchase Orders</Link>
+        </Button>
       </div>
     );
   }
 
-  const utilizationPct = po.amount > 0
-    ? Math.round(((po.amount - po.remainingValue) / po.amount) * 100)
-    : 0;
+  const amount = toNumber(po.amount);
+  const remainingValue = toNumber(po.remainingValue);
+  const utilizedValue = Math.max(0, amount - remainingValue);
+  const utilizationPct = amount > 0 ? Math.round((utilizedValue / amount) * 100) : 0;
+  const details = parsePONotes(po.notes);
+  const paymentTermsLabel =
+    po.paymentTerms === "CUSTOM" && po.customPaymentDays
+      ? `Custom (${po.customPaymentDays} days)`
+      : po.paymentTerms.replace(/_/g, " ");
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
+    <div className="mx-auto max-w-4xl space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold">{po.poNumber}</h1>
-              <Badge variant={STATUS_BADGE[po.status] ?? "outline"}>{po.status.replace(/_/g, " ")}</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold">{po.internalId}</h1>
+              <Badge variant="outline">{po.documentType.replace(/_/g, " ")}</Badge>
+              <Badge variant="secondary">{po.invoiceType}</Badge>
+              {details.division ? <Badge variant="muted">{details.division}</Badge> : null}
             </div>
-            <p className="text-sm text-muted-foreground">{po.client.name} · {po.division} Division</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {po.client.name} · Ref: {po.referenceNumber}
+            </p>
           </div>
         </div>
-        <Link href={`/projects/new?poId=${po.id}`}>
-          <Button variant="brand" size="sm">
-            <Plus className="h-4 w-4" />
-            New Project
+
+        <div className="flex flex-wrap gap-2">
+          {can("po:edit") ? (
+            <Button asChild variant="outline">
+              <Link href={`/pos/${po.id}/edit`}>
+                <FilePenLine className="h-4 w-4" />
+                Edit PO
+              </Link>
+            </Button>
+          ) : null}
+          <Button asChild variant="brand">
+            <Link href={`/projects/new?poId=${po.id}`}>
+              <Plus className="h-4 w-4" />
+              New Project
+            </Link>
           </Button>
-        </Link>
+        </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">Total Value</p>
-            <p className="text-lg font-bold">{formatINR(po.amount)}</p>
+            <p className="text-xs text-muted-foreground">PO Value</p>
+            <p className="text-lg font-bold">{formatINR(amount)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">Remaining</p>
-            <p className="text-lg font-bold text-green-600">{formatINR(po.remainingValue)}</p>
+            <p className="text-xs text-muted-foreground">Remaining Value</p>
+            <p className="text-lg font-bold text-green-600">{formatINR(remainingValue)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">Utilised</p>
+            <p className="text-xs text-muted-foreground">Utilisation</p>
             <p className="text-lg font-bold">{utilizationPct}%</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <p className="text-xs text-muted-foreground">Projects</p>
-            <p className="text-lg font-bold">{po.projects.length}</p>
+            <p className="text-xs text-muted-foreground">Working Days</p>
+            <p className="text-lg font-bold">{po.expectedWorkingDays}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Scope */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Scope of Work
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm whitespace-pre-line">{po.scope}</p>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileText className="h-4 w-4" />
+              Scope and Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Scope of Work</p>
+              <p className="mt-2 whitespace-pre-line text-sm">
+                {details.scope || "No scope details were added for this PO."}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Internal Notes</p>
+              <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
+                {details.additionalNotes || "No internal notes available."}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Timeline
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-muted-foreground">Start Date</p>
-            <p className="font-medium">{format(new Date(po.startDate), "dd MMM yyyy")}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">End Date</p>
-            <p className="font-medium">{format(new Date(po.endDate), "dd MMM yyyy")}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Created</p>
-            <p className="font-medium">{format(new Date(po.createdAt), "dd MMM yyyy")}</p>
-          </div>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">PO Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <p className="font-medium">Timeline</p>
+              </div>
+              <p className="mt-3 text-muted-foreground">
+                Start: {po.workStartDate ? formatDate(po.workStartDate) : "Not set"}
+              </p>
+              <p className="text-muted-foreground">Expiry: {formatDate(po.expiryDate)}</p>
+              <p className="text-muted-foreground">Created: {formatDate(po.createdAt)}</p>
+            </div>
 
-      {/* Projects */}
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <div className="flex items-center gap-2">
+                <UserCircle2 className="h-4 w-4 text-muted-foreground" />
+                <p className="font-medium">Assigned PM</p>
+              </div>
+              <p className="mt-3">{po.assignedPM?.name ?? "Not assigned"}</p>
+              <p className="text-xs text-muted-foreground">{po.assignedPM?.email ?? "No email available"}</p>
+            </div>
+
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <p className="font-medium">Payment Terms</p>
+              <p className="mt-3 text-muted-foreground">{paymentTermsLabel}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Linked Projects</CardTitle>
@@ -176,31 +232,28 @@ export default function PODetailPage() {
         <CardContent>
           {po.projects.length === 0 ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-muted-foreground">No projects created against this PO yet.</p>
-              <Link href={`/projects/new?poId=${po.id}`}>
-                <Button variant="outline" size="sm" className="mt-3">
-                  <Plus className="h-3 w-3 mr-1" />
-                  Create First Project
-                </Button>
-              </Link>
+              <p className="text-sm text-muted-foreground">No projects have been linked to this PO yet.</p>
+              <Button asChild variant="outline" className="mt-4">
+                <Link href={`/projects/new?poId=${po.id}`}>Create First Project</Link>
+              </Button>
             </div>
           ) : (
-            <div className="space-y-2">
-              {po.projects.map((proj) => (
-                <div key={proj.id} className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-3">
+              {po.projects.map((project) => (
+                <div key={project.id} className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-medium text-sm">{proj.title}</p>
-                    <p className="text-xs text-muted-foreground">{proj.projectId} · {proj.division}</p>
+                    <p className="font-medium">{project.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {project.daysConsumed}/{project.daysAuthorised} days used · Created {formatDate(project.createdAt)}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {proj.status.replace(/_/g, " ")}
-                    </Badge>
-                    <Link href={`/projects/${proj.id}`}>
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    </Link>
+                    <Badge variant="outline">{project.status.replace(/_/g, " ")}</Badge>
+                    <Button asChild variant="ghost" size="icon">
+                      <Link href={`/projects/${project.id}`}>
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -209,16 +262,38 @@ export default function PODetailPage() {
         </CardContent>
       </Card>
 
-      {po.notes && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Notes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground whitespace-pre-line">{po.notes}</p>
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Receipt className="h-4 w-4" />
+            Related Invoices
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {po.invoices.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No invoices have been raised against this PO yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {po.invoices.map((invoice) => (
+                <div key={invoice.id} className="flex flex-col gap-2 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">{invoice.invoiceNumber}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(invoice.invoiceDate)} · {invoice.status.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm font-semibold">{formatINR(invoice.totalAmount)}</p>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/invoices/${invoice.id}`}>Open</Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -43,12 +43,38 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, loading, children, disabled, ...props }, ref) => {
+  ({ className, variant, size, loading, children, disabled, asChild, onClick, ...props }, ref) => {
+    const classes = cn(buttonVariants({ variant, size, className }));
+
+    if (asChild && React.isValidElement(children)) {
+      const child = children as React.ReactElement<any>;
+
+      return React.cloneElement(child, {
+        className: cn(classes, child.props.className),
+        onClick: (event: React.MouseEvent<HTMLElement>) => {
+          if (disabled || loading) {
+            event.preventDefault();
+            return;
+          }
+
+          child.props.onClick?.(event);
+          onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>);
+        },
+        ...(disabled || loading
+          ? {
+              "aria-disabled": true,
+              "data-disabled": "",
+            }
+          : {}),
+      });
+    }
+
     return (
       <button
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={classes}
         ref={ref}
         disabled={disabled || loading}
+        onClick={onClick}
         {...props}
       >
         {loading && (

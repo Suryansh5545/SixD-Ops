@@ -1,13 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, Plus } from "lucide-react";
-import Link from "next/link";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,18 +22,18 @@ const schema = z.object({
   location: z.string().min(1, "Location is required"),
   plannedStartDate: z.string().min(1, "Start date is required"),
   plannedEndDate: z.string().min(1, "End date is required"),
-  expectedWorkingDays: z.coerce.number().int().positive(),
+  expectedWorkingDays: z.coerce.number().int().positive("Working days must be positive"),
   notes: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
 
-interface PO {
+interface ProjectPOOption {
   id: string;
-  poNumber: string;
-  client: { name: string };
-  amount: number;
-  remainingValue: number;
+  internalId: string;
+  client: { id: string; name: string };
+  assignedPM: { id: string; name: string };
+  remainingValue: string;
 }
 
 export default function NewProjectPage() {
@@ -42,12 +42,14 @@ export default function NewProjectPage() {
   const preselectedPOId = searchParams.get("poId") ?? "";
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: pos } = useQuery<PO[]>({
+  const { data: pos = [] } = useQuery<ProjectPOOption[]>({
     queryKey: ["pos-active"],
     queryFn: async () => {
-      const res = await fetch("/api/pos?status=ACTIVE");
+      const res = await fetch("/api/pos?status=ACTIVE&limit=100", { cache: "no-store" });
       if (!res.ok) return [];
-      return res.json();
+
+      const json = await res.json().catch(() => null);
+      return Array.isArray(json?.data?.items) ? (json.data.items as ProjectPOOption[]) : [];
     },
   });
 
@@ -66,35 +68,63 @@ export default function NewProjectPage() {
   });
 
   const selectedPOId = watch("poId");
-  const selectedPO = pos?.find((p) => p.id === selectedPOId);
+  const selectedPO = pos.find((po) => po.id === selectedPOId);
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
+    if (!selectedPO) {
+      toast({
+        title: "Select a valid PO",
+        description: "Project creation needs an active purchase order.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
+      const payload = {
+        poId: values.poId,
+        clientId: selectedPO.client.id,
+        name: values.title,
+        description: values.notes || null,
+        division: values.division,
+        pmId: selectedPO.assignedPM.id,
+        startDate: values.plannedStartDate,
+        endDate: values.plannedEndDate,
+        daysAuthorised: values.expectedWorkingDays,
+        siteLocation: values.location,
+      };
+
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to create project");
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success || !json?.data) {
+        throw new Error(json?.error || "Failed to create project");
       }
 
-      const project = await res.json();
-      toast({ title: "Project created", description: `${project.projectId} created successfully` });
-      router.push(`/projects/${project.id}`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "An error occurred";
-      toast({ title: "Error", description: message, variant: "destructive" });
+      toast({
+        title: "Project created",
+        description: `${json.data.name} was created successfully.`,
+      });
+      router.push("/projects");
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center gap-3">
         <Link href="/projects">
           <Button variant="ghost" size="icon">
@@ -108,7 +138,6 @@ export default function NewProjectPage() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Link to PO */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Link to Purchase Order</CardTitle>
@@ -121,10 +150,10 @@ export default function NewProjectPage() {
                 className="flex h-9 w-full appearance-none rounded-lg border border-input bg-transparent px-3 py-1 pr-8 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 {...register("poId")}
               >
-                <option value="">Select PO…</option>
-                {pos?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.poNumber} — {p.client.name}
+                <option value="">Select PO...</option>
+                {pos.map((po) => (
+                  <option key={po.id} value={po.id}>
+                    {po.internalId} - {po.client.name}
                   </option>
                 ))}
               </select>
@@ -132,17 +161,15 @@ export default function NewProjectPage() {
             </div>
 
             {selectedPO && (
-              <div className="rounded-lg bg-muted px-4 py-3 text-sm space-y-1">
+              <div className="space-y-1 rounded-lg bg-muted px-4 py-3 text-sm">
                 <p className="font-medium">{selectedPO.client.name}</p>
-                <p className="text-muted-foreground">
-                  Remaining value: ₹{selectedPO.remainingValue.toLocaleString("en-IN")}
-                </p>
+                <p className="text-muted-foreground">Assigned PM: {selectedPO.assignedPM.name}</p>
+                <p className="text-muted-foreground">Remaining value: {selectedPO.remainingValue}</p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Project Details */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Project Details</CardTitle>
@@ -152,7 +179,7 @@ export default function NewProjectPage() {
               <Label htmlFor="title">Project Title *</Label>
               <Input
                 id="title"
-                placeholder="e.g. Annual Maintenance Survey — Jamshedpur BF#5"
+                placeholder="e.g. Annual Maintenance Survey - Jamshedpur BF#5"
                 {...register("title")}
               />
               {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
@@ -167,32 +194,20 @@ export default function NewProjectPage() {
                   {...register("division")}
                 >
                   <option value="TS">TS (Technical Services)</option>
-                  <option value="LSS">LS&amp;S</option>
+                  <option value="LSS">LS&S</option>
                 </select>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="location">Location *</Label>
-                <Input
-                  id="location"
-                  placeholder="e.g. Jamshedpur, Jharkhand"
-                  {...register("location")}
-                />
+                <Input id="location" placeholder="e.g. Jamshedpur, Jharkhand" {...register("location")} />
                 {errors.location && <p className="text-xs text-destructive">{errors.location.message}</p>}
               </div>
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="expectedWorkingDays">Expected Working Days *</Label>
-              <Input
-                id="expectedWorkingDays"
-                type="number"
-                min={1}
-                {...register("expectedWorkingDays")}
-              />
-              <p className="text-xs text-muted-foreground">
-                Used to calculate the daily rate for invoicing (PO value ÷ working days)
-              </p>
+              <Input id="expectedWorkingDays" type="number" min={1} {...register("expectedWorkingDays")} />
               {errors.expectedWorkingDays && (
                 <p className="text-xs text-destructive">{errors.expectedWorkingDays.message}</p>
               )}
@@ -200,7 +215,6 @@ export default function NewProjectPage() {
           </CardContent>
         </Card>
 
-        {/* Timeline */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Planned Timeline</CardTitle>
@@ -208,22 +222,14 @@ export default function NewProjectPage() {
           <CardContent className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="plannedStartDate">Planned Start *</Label>
-              <Input
-                id="plannedStartDate"
-                type="date"
-                {...register("plannedStartDate")}
-              />
+              <Input id="plannedStartDate" type="date" {...register("plannedStartDate")} />
               {errors.plannedStartDate && (
                 <p className="text-xs text-destructive">{errors.plannedStartDate.message}</p>
               )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="plannedEndDate">Planned End *</Label>
-              <Input
-                id="plannedEndDate"
-                type="date"
-                {...register("plannedEndDate")}
-              />
+              <Input id="plannedEndDate" type="date" {...register("plannedEndDate")} />
               {errors.plannedEndDate && (
                 <p className="text-xs text-destructive">{errors.plannedEndDate.message}</p>
               )}
@@ -231,24 +237,20 @@ export default function NewProjectPage() {
           </CardContent>
         </Card>
 
-        {/* Notes */}
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-1.5">
               <Label htmlFor="notes">Internal Notes</Label>
-              <Textarea
-                id="notes"
-                rows={3}
-                placeholder="Any pre-project notes or flags…"
-                {...register("notes")}
-              />
+              <Textarea id="notes" rows={3} placeholder="Any pre-project notes or flags..." {...register("notes")} />
             </div>
           </CardContent>
         </Card>
 
         <div className="flex justify-end gap-3">
           <Link href="/projects">
-            <Button variant="outline" type="button">Cancel</Button>
+            <Button variant="outline" type="button">
+              Cancel
+            </Button>
           </Link>
           <Button type="submit" variant="brand" loading={submitting}>
             <Plus className="h-4 w-4" />

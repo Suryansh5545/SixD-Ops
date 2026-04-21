@@ -88,9 +88,17 @@ DropdownMenuContent.displayName = "DropdownMenuContent";
 
 const DropdownMenuItem = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { inset?: boolean; disabled?: boolean }
->(({ className, inset, disabled, onClick, children, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & { inset?: boolean; disabled?: boolean; asChild?: boolean }
+>(({ className, inset, disabled, onClick, children, asChild, ...props }, ref) => {
   const { setOpen } = React.useContext(DropdownMenuContext);
+  const itemClasses = cn(
+    "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
+    disabled
+      ? "pointer-events-none opacity-50"
+      : "cursor-pointer hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+    inset && "pl-8",
+    className
+  );
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (disabled) return;
@@ -98,17 +106,31 @@ const DropdownMenuItem = React.forwardRef<
     setOpen(false);
   };
 
+  if (asChild && React.isValidElement(children)) {
+    const child = children as React.ReactElement<{
+      className?: string;
+      onClick?: React.MouseEventHandler<HTMLElement>;
+    }>;
+
+    return React.cloneElement(child, {
+      className: cn(itemClasses, child.props.className),
+      onClick: (event: React.MouseEvent<HTMLElement>) => {
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
+
+        child.props.onClick?.(event);
+        onClick?.(event as unknown as React.MouseEvent<HTMLDivElement>);
+        setOpen(false);
+      },
+    });
+  }
+
   return (
     <div
       ref={ref}
-      className={cn(
-        "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
-        disabled
-          ? "pointer-events-none opacity-50"
-          : "cursor-pointer hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-        inset && "pl-8",
-        className
-      )}
+      className={itemClasses}
       onClick={handleClick}
       {...props}
     >

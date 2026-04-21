@@ -7,10 +7,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { guardRoute } from "@/lib/utils/permissions";
-import { AssignTeamSchema } from "@/lib/validations/project";
+import { AssignTeamSchema, type AssignTeamInput } from "@/lib/validations/project";
 import { NotificationService } from "@/lib/services/NotificationService";
 
 type RouteContext = { params: { id: string } };
+
+const LegacyAssignmentSchema = AssignTeamSchema.shape.engineers.element.extend({
+  engineerId: AssignTeamSchema.shape.engineers.element.shape.engineerId.optional(),
+  role: AssignTeamSchema.shape.engineers.element.shape.role.optional().default("Field Engineer"),
+});
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   try {
@@ -32,7 +37,40 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       orderBy: { startDate: "asc" },
     });
 
-    return NextResponse.json({ success: true, data: deployments });
+    const engineers = deployments.map((deployment) => ({
+      id: deployment.engineer.id,
+      deploymentId: deployment.id,
+      name: deployment.engineer.user.name,
+      email: deployment.engineer.user.email,
+      division: deployment.engineer.division,
+      level: deployment.engineer.level,
+      currentStatus: deployment.engineer.currentStatus,
+      role: deployment.role,
+      startDate: deployment.startDate,
+      endDate: deployment.endDate,
+      equipmentId: deployment.equipmentId,
+      equipmentName: deployment.equipment?.name ?? null,
+    }));
+
+    const equipment = deployments
+      .filter((deployment) => deployment.equipment)
+      .map((deployment) => ({
+        id: deployment.equipment!.id,
+        name: deployment.equipment!.name,
+        type: deployment.equipment!.division,
+        serialNumber: deployment.equipment!.serialNumber,
+        deploymentId: deployment.id,
+        assignedEngineerId: deployment.engineer.id,
+      }));
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        deployments,
+        engineers,
+        equipment,
+      },
+    });
   } catch (error) {
     console.error("[GET /api/projects/:id/team]", error);
     return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
@@ -51,14 +89,32 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
 
     const body = await req.json();
     const parsed = AssignTeamSchema.safeParse(body);
-    if (!parsed.success) {
+    let engineers: AssignTeamInput["engineers"] | null =
+      parsed.success
+        ? parsed.data.engineers
+        : null;
+
+    if (!engineers) {
+      const legacyParsed = LegacyAssignmentSchema.safeParse(body);
+      if (legacyParsed.success && legacyParsed.data.engineerId) {
+        engineers = [
+          {
+            engineerId: legacyParsed.data.engineerId,
+            role: legacyParsed.data.role,
+            startDate: legacyParsed.data.startDate,
+            endDate: legacyParsed.data.endDate ?? null,
+            equipmentId: legacyParsed.data.equipmentId ?? null,
+          },
+        ];
+      }
+    }
+
+    if (!engineers) {
       return NextResponse.json(
-        { success: false, error: "Validation failed", details: parsed.error.flatten() },
+        { success: false, error: "Validation failed" },
         { status: 400 }
       );
     }
-
-    const { engineers } = parsed.data;
 
     // ─── Double-booking check ──────────────────────────────────────────────
 

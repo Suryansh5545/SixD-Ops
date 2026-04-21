@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -11,7 +11,11 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const session = await requireAuth();
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { currentPin, newPin } = schema.parse(body);
 
@@ -33,9 +37,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors[0].message }, { status: 422 });
     }

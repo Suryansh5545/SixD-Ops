@@ -1,87 +1,153 @@
 "use client";
 
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users, Search, Filter } from "lucide-react";
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Pencil, Plus, Search, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import Link from "next/link";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/useAuth";
 
-interface Engineer {
+interface EngineerApi {
   id: string;
-  name: string;
-  email: string;
-  phone?: string;
   division: "TS" | "LSS";
-  currentStatus: "IDLE" | "WORKING" | "STANDBY" | "ON_LEAVE";
-  activeProject?: {
-    id: string;
-    projectId: string;
-    title: string;
-    client: { name: string };
+  level: "HEAD" | "LEADER" | "FIELD";
+  currentStatus: string | null;
+  user: {
+    name: string;
+    email: string;
+    isActive: boolean;
   };
+  currentDeployment?: {
+    project: {
+      id: string;
+      name: string;
+      client: { name: string };
+    };
+  } | null;
 }
 
-const STATUS_CONFIG: Record<string, {
-  label: string;
-  variant: "success" | "warning" | "muted" | "info";
-  dot: string;
-}> = {
-  WORKING: { label: "Working", variant: "success", dot: "bg-green-500" },
-  STANDBY: { label: "Standby", variant: "warning", dot: "bg-amber-500" },
-  IDLE: { label: "Available", variant: "muted", dot: "bg-slate-400" },
-  ON_LEAVE: { label: "On Leave", variant: "info", dot: "bg-blue-500" },
+interface EngineerCard {
+  id: string;
+  activeProject: {
+    client: { name: string };
+    id: string;
+    title: string;
+  } | null;
+  division: "TS" | "LSS";
+  email: string;
+  isActive: boolean;
+  level: "HEAD" | "LEADER" | "FIELD";
+  name: string;
+  statusKey: "WORKING" | "STANDBY" | "IDLE" | "ON_LEAVE";
+}
+
+const STATUS_CONFIG = {
+  WORKING: { label: "Working", variant: "success" as const, dot: "bg-green-500" },
+  STANDBY: { label: "Standby", variant: "warning" as const, dot: "bg-amber-500" },
+  IDLE: { label: "Available", variant: "muted" as const, dot: "bg-slate-400" },
+  ON_LEAVE: { label: "On Leave", variant: "info" as const, dot: "bg-blue-500" },
 };
 
+function mapStatus(status: string | null): EngineerCard["statusKey"] {
+  if (status === "WORKING_ON_JOB" || status === "TRAVELLING_TO_SITE") return "WORKING";
+  if (status === "STANDBY_BLOCKED" || status === "SITE_WAITING") return "STANDBY";
+  if (status === "ON_LEAVE") return "ON_LEAVE";
+  return "IDLE";
+}
+
+function normalizeEngineers(rows: EngineerApi[]): EngineerCard[] {
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.user.name,
+    email: row.user.email,
+    division: row.division,
+    level: row.level,
+    isActive: row.user.isActive,
+    statusKey: mapStatus(row.currentStatus),
+    activeProject: row.currentDeployment?.project
+      ? {
+          id: row.currentDeployment.project.id,
+          title: row.currentDeployment.project.name,
+          client: row.currentDeployment.project.client,
+        }
+      : null,
+  }));
+}
+
+function formatLevel(level: EngineerCard["level"]) {
+  return level === "FIELD" ? "Field Engineer" : level.charAt(0) + level.slice(1).toLowerCase();
+}
+
 export default function TeamPage() {
+  const { can } = useAuth();
   const [search, setSearch] = useState("");
   const [division, setDivision] = useState<"ALL" | "TS" | "LSS">("ALL");
 
-  const { data: engineers, isLoading } = useQuery<Engineer[]>({
-    queryKey: ["engineers"],
+  const { data: engineers = [], isLoading, isError } = useQuery<EngineerCard[]>({
+    queryKey: ["team-engineers"],
     queryFn: async () => {
-      const res = await fetch("/api/engineers");
+      const res = await fetch("/api/engineers", { cache: "no-store" });
       if (!res.ok) return [];
-      return res.json();
+
+      const json = await res.json().catch(() => null);
+      const rows = Array.isArray(json?.data) ? (json.data as EngineerApi[]) : [];
+      return normalizeEngineers(rows);
     },
-    refetchInterval: 30000,
+    refetchInterval: 30_000,
   });
 
-  const filtered = (engineers ?? []).filter((e) => {
-    const matchSearch = search === "" ||
-      e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.activeProject?.title.toLowerCase().includes(search.toLowerCase());
-    const matchDiv = division === "ALL" || e.division === division;
-    return matchSearch && matchDiv;
-  });
+  const filtered = useMemo(() => {
+    return engineers.filter((engineer) => {
+      const needle = search.trim().toLowerCase();
+      const matchSearch =
+        needle === "" ||
+        engineer.name.toLowerCase().includes(needle) ||
+        engineer.email.toLowerCase().includes(needle) ||
+        engineer.activeProject?.title.toLowerCase().includes(needle);
+
+      const matchDivision = division === "ALL" || engineer.division === division;
+      return matchSearch && matchDivision;
+    });
+  }, [division, engineers, search]);
 
   const grouped = {
-    TS: filtered.filter((e) => e.division === "TS"),
-    LSS: filtered.filter((e) => e.division === "LSS"),
+    TS: filtered.filter((engineer) => engineer.division === "TS"),
+    LSS: filtered.filter((engineer) => engineer.division === "LSS"),
   };
 
   const stats = {
-    total: engineers?.length ?? 0,
-    working: engineers?.filter((e) => e.currentStatus === "WORKING").length ?? 0,
-    standby: engineers?.filter((e) => e.currentStatus === "STANDBY").length ?? 0,
-    idle: engineers?.filter((e) => e.currentStatus === "IDLE").length ?? 0,
+    total: engineers.length,
+    working: engineers.filter((engineer) => engineer.statusKey === "WORKING").length,
+    standby: engineers.filter((engineer) => engineer.statusKey === "STANDBY").length,
+    idle: engineers.filter((engineer) => engineer.statusKey === "IDLE").length,
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Field Team</h1>
-          <p className="text-sm text-muted-foreground">Real-time deployment status</p>
+          <p className="text-sm text-muted-foreground">
+            Live view of engineer availability, current assignments, and team access.
+          </p>
         </div>
+
+        {can("team:manage") ? (
+          <Button asChild variant="brand">
+            <Link href="/team/new">
+              <Plus className="h-4 w-4" />
+              Add Member
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="pt-4">
             <p className="text-xs text-muted-foreground">Total Engineers</p>
@@ -108,37 +174,36 @@ export default function TeamPage() {
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="relative max-w-md flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search engineers…"
+            placeholder="Search engineers..."
             className="pl-9"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
           />
         </div>
         <div className="flex gap-2">
-          {(["ALL", "TS", "LSS"] as const).map((d) => (
+          {(["ALL", "TS", "LSS"] as const).map((value) => (
             <button
-              key={d}
-              onClick={() => setDivision(d)}
+              key={value}
+              onClick={() => setDivision(value)}
               className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                division === d
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "hover:bg-muted"
+                division === value ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted"
               }`}
             >
-              {d === "ALL" ? "All" : d}
+              {value === "ALL" ? "All" : value}
             </button>
           ))}
         </div>
       </div>
 
       {isLoading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3,4,5,6].map(n => <Skeleton key={n} className="h-32 w-full" />)}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((item) => (
+            <Skeleton key={item} className="h-44 w-full" />
+          ))}
         </div>
       ) : (
         <Tabs defaultValue="ALL">
@@ -148,45 +213,62 @@ export default function TeamPage() {
             <TabsTrigger value="LSS">LS&S ({grouped.LSS.length})</TabsTrigger>
           </TabsList>
 
-          {["ALL", "TS", "LSS"].map((tab) => {
-            const list = tab === "ALL" ? filtered : filtered.filter(e => e.division === tab);
+          {(["ALL", "TS", "LSS"] as const).map((tab) => {
+            const list = tab === "ALL" ? filtered : grouped[tab];
+
             return (
               <TabsContent key={tab} value={tab}>
                 {list.length === 0 ? (
                   <div className="py-12 text-center text-muted-foreground">
-                    <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">No engineers match your filter</p>
+                    <Users className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                    <p className="text-sm">
+                      {isError ? "Team data is unavailable right now." : "No engineers match your filter."}
+                    </p>
+                    {can("team:manage") && !isError ? (
+                      <Button asChild variant="outline" className="mt-4">
+                        <Link href="/team/new">Create the first team member</Link>
+                      </Button>
+                    ) : null}
                   </div>
                 ) : (
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {list.map((eng) => {
-                      const cfg = STATUS_CONFIG[eng.currentStatus] ?? STATUS_CONFIG.IDLE;
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {list.map((engineer) => {
+                      const config = STATUS_CONFIG[engineer.statusKey];
+
                       return (
-                        <Card key={eng.id} className="hover:shadow-md transition-shadow">
-                          <CardContent className="pt-4 space-y-3">
-                            <div className="flex items-start justify-between">
+                        <Card key={engineer.id} className="transition-shadow hover:shadow-md">
+                          <CardContent className="space-y-4 pt-4">
+                            <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="font-semibold">{eng.name}</p>
-                                <p className="text-xs text-muted-foreground">{eng.division} Division</p>
+                                <p className="font-semibold">{engineer.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {engineer.division} Division · {formatLevel(engineer.level)}
+                                </p>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <div className={`h-2 w-2 rounded-full ${cfg.dot}`} />
-                                <Badge variant={cfg.variant} className="text-xs">
-                                  {cfg.label}
+                                <div className={`h-2 w-2 rounded-full ${config.dot}`} />
+                                <Badge variant={config.variant} className="text-xs">
+                                  {config.label}
                                 </Badge>
                               </div>
                             </div>
 
-                            {eng.activeProject ? (
+                            <div className="flex items-center gap-2">
+                              <Badge variant={engineer.isActive ? "success" : "muted"}>
+                                {engineer.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </div>
+
+                            {engineer.activeProject ? (
                               <div className="rounded-lg bg-muted px-3 py-2">
                                 <p className="text-xs text-muted-foreground">Current Project</p>
-                                <Link href={`/projects/${eng.activeProject.id}`}>
-                                  <p className="text-sm font-medium hover:underline truncate">
-                                    {eng.activeProject.title}
+                                <Link href={`/projects/${engineer.activeProject.id}`}>
+                                  <p className="truncate text-sm font-medium hover:underline">
+                                    {engineer.activeProject.title}
                                   </p>
                                 </Link>
                                 <p className="text-xs text-muted-foreground">
-                                  {eng.activeProject.client.name}
+                                  {engineer.activeProject.client.name}
                                 </p>
                               </div>
                             ) : (
@@ -195,9 +277,18 @@ export default function TeamPage() {
                               </div>
                             )}
 
-                            {eng.email && (
-                              <p className="text-xs text-muted-foreground truncate">{eng.email}</p>
-                            )}
+                            <p className="truncate text-xs text-muted-foreground">{engineer.email}</p>
+
+                            {can("team:manage") ? (
+                              <div className="flex justify-end">
+                                <Button asChild variant="outline" size="sm">
+                                  <Link href={`/team/${engineer.id}/edit`}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Edit
+                                  </Link>
+                                </Button>
+                              </div>
+                            ) : null}
                           </CardContent>
                         </Card>
                       );

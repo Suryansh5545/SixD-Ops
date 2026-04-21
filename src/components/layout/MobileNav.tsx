@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { Home, ClipboardList, DollarSign, User } from "lucide-react";
+import { Home, ClipboardList, Bell, User } from "lucide-react";
 import type { Role } from "@prisma/client";
 
 /**
@@ -22,7 +22,7 @@ export function MobileNav() {
   const items = [
     { label: "Home", href: "/dashboard", icon: Home },
     { label: "Log Today", href: "/projects", icon: ClipboardList },
-    { label: "Expenses", href: "/expenses", icon: DollarSign },
+    { label: "Alerts", href: "/notifications", icon: Bell },
     { label: "Profile", href: "/settings", icon: User },
   ];
 
