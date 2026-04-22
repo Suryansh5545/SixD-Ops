@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute } from "@/lib/utils/permissions";
+import { getPermissionOverrides, guardRoute } from "@/lib/utils/permissions";
 import { UpdateInvoiceSchema, UpdateInvoiceStatusSchema } from "@/lib/validations/invoice";
 import { NotificationService } from "@/lib/services/NotificationService";
 import { calcGST, toNumber } from "@/lib/utils/currency";
@@ -67,11 +67,22 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
     // Determine if this is a status update or a content update
     if ("status" in body) {
-      return handleStatusUpdate(req, params.id, session.user.id, session.user.roles as import("@prisma/client").Role[], body);
+      return handleStatusUpdate(
+        req,
+        params.id,
+        session.user.id,
+        session.user.roles as import("@prisma/client").Role[],
+        getPermissionOverrides(session.user),
+        body
+      );
     }
 
     // Content update — PM editing draft
-    const guard = guardRoute(session.user.roles, "invoice:edit");
+    const guard = guardRoute(
+      session.user.roles,
+      "invoice:edit",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const parsed = UpdateInvoiceSchema.safeParse(body);
@@ -155,6 +166,7 @@ async function handleStatusUpdate(
   invoiceId: string,
   userId: string,
   userRoles: import("@prisma/client").Role[],
+  permissionOverrides: import("@/lib/rbac").PermissionOverrideSet,
   body: unknown
 ) {
   const parsed = UpdateInvoiceStatusSchema.safeParse(body);
@@ -177,7 +189,7 @@ async function handleStatusUpdate(
   const requiredPermission = statusPermissions[status];
   if (requiredPermission) {
     const { guardRoute } = await import("@/lib/utils/permissions");
-    const guard = guardRoute(userRoles, requiredPermission);
+    const guard = guardRoute(userRoles, requiredPermission, permissionOverrides);
     if (guard) return guard;
   }
 
@@ -258,7 +270,10 @@ async function handleStatusUpdate(
   // Notify accounts on submission for review
   if (status === "UNDER_REVIEW") {
     const accountsUsers = await prisma.user.findMany({
-      where: { role: "ACCOUNTS", isActive: true },
+      where: {
+        OR: [{ role: "ACCOUNTS" }, { roles: { has: "ACCOUNTS" } }],
+        isActive: true,
+      },
       select: { id: true },
     });
     await NotificationService.notifyInvoiceReadyForReview(

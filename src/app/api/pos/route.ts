@@ -6,8 +6,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute } from "@/lib/utils/permissions";
-import { generateInternalId, sanitiseText } from "@/lib/utils/permissions";
+import {
+  generateInternalId,
+  getPermissionOverrides,
+  guardRoute,
+  sanitiseText,
+} from "@/lib/utils/permissions";
 import { CreatePOSchema } from "@/lib/validations/po";
 import { NotificationService } from "@/lib/services/NotificationService";
 import { AuditLog } from "@prisma/client";
@@ -19,7 +23,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "po:view_all");
+    const guard = guardRoute(
+      session.user.roles,
+      "po:view_all",
+      getPermissionOverrides(session.user)
+    );
     // If not view_all, check view_own (BD Team, BMs see their own)
     const canViewAll = !guard;
 
@@ -90,7 +98,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "po:create");
+    const guard = guardRoute(
+      session.user.roles,
+      "po:create",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const body = await req.json();

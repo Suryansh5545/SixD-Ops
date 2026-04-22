@@ -18,18 +18,16 @@ enum Role {
   MD
   CFO
   BUSINESS_HEAD
-  BUSINESS_MANAGER_STEEL
-  BUSINESS_MANAGER_TATA_GOVT
-  BD_TEAM
-  PROJECT_MANAGER
-  FIELD_ENGINEER
-  ADMIN_COORDINATOR
   ACCOUNTS
+  BD_TEAM
+  BUSINESS_MANAGER
+  SALES_TEAM
+  FIELD_ENGINEER
 }
 
 enum Division {
-  TS   // Technical Services
-  LSS  // Laser Scanning & Survey
+  TS // Technical Services
+  LSS // Laser Scanning & Survey
 }
 
 enum EngineerLevel {
@@ -159,91 +157,93 @@ enum ReminderStatus {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String?
-  pin          String?  // 6-digit PIN hashed with bcrypt (for field engineers)
-  role         Role     // Primary role
-  roles        Role[]   // All roles (supports dual-role users like Syed Ali)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  name              String
+  email             String   @unique
+  passwordHash      String?
+  pin               String? // 6-digit PIN hashed with bcrypt (for field engineers)
+  role              Role // Primary role
+  roles             Role[]   @default([]) // Additional roles for shared responsibilities
+  permissionGrants  String[] @default([]) // Direct permission grants for exceptional access cases
+  permissionRevokes String[] @default([]) // Direct permission revokes to restrict a role default
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   // Relations
-  engineer              Engineer?
-  assignedPOs           PurchaseOrder[]      @relation("AssignedPM")
-  createdPOs            PurchaseOrder[]      @relation("CreatedBy")
-  managedProjects       Project[]            @relation("ProjectPM")
-  createdMOMs           MOM[]
-  submittedReports      Report[]
-  createdInvoices       Invoice[]            @relation("InvoiceCreatedBy")
-  reviewedInvoices      Invoice[]            @relation("InvoiceReviewedBy")
-  recordedPayments      Payment[]
-  uploadedCompliance    ComplianceDocument[]
-  uploadedDocs          ProjectDocument[]
-  uploadedProjectDocs   ProjectComplianceDoc[] @relation("ProjectComplianceDocUploader")
-  notifications         Notification[]
-  auditLogs             AuditLog[]
+  engineer            Engineer?
+  assignedPOs         PurchaseOrder[]        @relation("AssignedPM")
+  createdPOs          PurchaseOrder[]        @relation("CreatedBy")
+  managedProjects     Project[]              @relation("ProjectPM")
+  createdMOMs         MOM[]
+  submittedReports    Report[]
+  createdInvoices     Invoice[]              @relation("InvoiceCreatedBy")
+  reviewedInvoices    Invoice[]              @relation("InvoiceReviewedBy")
+  recordedPayments    Payment[]
+  uploadedCompliance  ComplianceDocument[]
+  uploadedDocs        ProjectDocument[]
+  uploadedProjectDocs ProjectComplianceDoc[] @relation("ProjectComplianceDocUploader")
+  notifications       Notification[]
+  auditLogs           AuditLog[]
 
   @@index([role])
   @@index([email])
 }
 
 model Engineer {
-  id               String       @id @default(cuid())
-  userId           String       @unique
-  user             User         @relation(fields: [userId], references: [id])
+  id               String        @id @default(cuid())
+  userId           String        @unique
+  user             User          @relation(fields: [userId], references: [id])
   division         Division
   level            EngineerLevel
   currentStatus    DailyStatus?
   currentProjectId String?
 
   // Relations
-  deployments      Deployment[]
-  logSheetEntries  LogSheetEntry[]
-  expenseClaims    ExpenseClaim[]
+  deployments     Deployment[]
+  logSheetEntries LogSheetEntry[]
+  expenseClaims   ExpenseClaim[]
 
   @@index([division])
   @@index([level])
 }
 
 model Client {
-  id                    String         @id @default(cuid())
-  name                  String         @unique
-  sector                IndustrySector
-  paymentTermsDefault   PaymentTerms   @default(NET_30)
-  gstPercent            Float          @default(18.0) // Per-client configurable GST rate
-  portalType            String?        // e.g. "JSW SAP", "TATA Vendor Portal"
-  gstNumber             String?
-  address               String?
-  contactPerson         String?
-  contactEmail          String?
-  contactPhone          String?
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  id                  String         @id @default(cuid())
+  name                String         @unique
+  sector              IndustrySector
+  paymentTermsDefault PaymentTerms   @default(NET_30)
+  gstPercent          Float          @default(18.0) // Per-client configurable GST rate
+  portalType          String? // e.g. "JSW SAP", "TATA Vendor Portal"
+  gstNumber           String?
+  address             String?
+  contactPerson       String?
+  contactEmail        String?
+  contactPhone        String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
   // Relations
-  purchaseOrders        PurchaseOrder[]
-  projects              Project[]
-  complianceDocuments   ComplianceDocument[]
-  complianceChecklists  ClientComplianceRequirement[]
+  purchaseOrders       PurchaseOrder[]
+  projects             Project[]
+  complianceDocuments  ComplianceDocument[]
+  complianceChecklists ClientComplianceRequirement[]
 
   @@index([sector])
 }
 
 model Equipment {
-  id               String    @id @default(cuid())
+  id               String   @id @default(cuid())
   name             String
-  serialNumber     String    @unique
+  serialNumber     String   @unique
   division         Division
-  isAvailable      Boolean   @default(true)
+  isAvailable      Boolean  @default(true)
   currentProjectId String?
   notes            String?
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime @default(now())
 
   // Relations
-  deployments      Deployment[]
+  deployments Deployment[]
 
   @@index([division])
   @@index([isAvailable])
@@ -264,7 +264,7 @@ model PurchaseOrder {
   expiryDate          DateTime     @db.Date
   expectedWorkingDays Int
   paymentTerms        PaymentTerms @default(NET_30)
-  customPaymentDays   Int?         // Used when paymentTerms = CUSTOM
+  customPaymentDays   Int? // Used when paymentTerms = CUSTOM
   invoiceType         InvoiceType
   assignedPMId        String
   assignedPM          User         @relation("AssignedPM", fields: [assignedPMId], references: [id])
@@ -277,8 +277,8 @@ model PurchaseOrder {
   updatedAt           DateTime     @updatedAt
 
   // Relations
-  projects            Project[]
-  invoices            Invoice[]
+  projects Project[]
+  invoices Invoice[]
 
   @@index([clientId])
   @@index([assignedPMId])
@@ -286,38 +286,38 @@ model PurchaseOrder {
 }
 
 model Project {
-  id                 String        @id @default(cuid())
-  poId               String
-  po                 PurchaseOrder @relation(fields: [poId], references: [id])
-  clientId           String
-  client             Client        @relation(fields: [clientId], references: [id])
-  name               String
-  description        String?
-  status             ProjectStatus @default(PO_RECEIVED)
-  division           Division?
-  pmId               String
-  pm                 User          @relation("ProjectPM", fields: [pmId], references: [id])
-  startDate          DateTime?     @db.Date
-  endDate            DateTime?     @db.Date
-  daysAuthorised     Int
-  daysConsumed       Int           @default(0) // Auto-calculated from log sheets
-  isBlocked          Boolean       @default(false)
-  blockedSince       DateTime?
-  standbyHoursTotal  Float         @default(0)
-  siteLocation       String?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  id                String        @id @default(cuid())
+  poId              String
+  po                PurchaseOrder @relation(fields: [poId], references: [id])
+  clientId          String
+  client            Client        @relation(fields: [clientId], references: [id])
+  name              String
+  description       String?
+  status            ProjectStatus @default(PO_RECEIVED)
+  division          Division?
+  pmId              String
+  pm                User          @relation("ProjectPM", fields: [pmId], references: [id])
+  startDate         DateTime?     @db.Date
+  endDate           DateTime?     @db.Date
+  daysAuthorised    Int
+  daysConsumed      Int           @default(0) // Auto-calculated from log sheets
+  isBlocked         Boolean       @default(false)
+  blockedSince      DateTime?
+  standbyHoursTotal Float         @default(0)
+  siteLocation      String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   // Relations
-  deployments        Deployment[]
-  logSheetEntries    LogSheetEntry[]
-  expenseClaims      ExpenseClaim[]
-  moms               MOM[]
-  reports            Report[]
-  invoices           Invoice[]
-  documents          ProjectDocument[]
-  complianceDocs     ProjectComplianceDoc[]
-  auditLogs          AuditLog[]       @relation("ProjectAuditLogs")
+  deployments     Deployment[]
+  logSheetEntries LogSheetEntry[]
+  expenseClaims   ExpenseClaim[]
+  moms            MOM[]
+  reports         Report[]
+  invoices        Invoice[]
+  documents       ProjectDocument[]
+  complianceDocs  ProjectComplianceDoc[]
+  auditLogs       AuditLog[]             @relation("ProjectAuditLogs")
 
   @@index([poId])
   @@index([clientId])
@@ -326,18 +326,18 @@ model Project {
 }
 
 model Deployment {
-  id           String           @id @default(cuid())
-  projectId    String
-  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  engineerId   String
-  engineer     Engineer         @relation(fields: [engineerId], references: [id])
-  role         String           // e.g. "Team Leader", "Field Engineer"
-  startDate    DateTime         @db.Date
-  endDate      DateTime?        @db.Date
-  equipmentId  String?
-  equipment    Equipment?       @relation(fields: [equipmentId], references: [id])
-  status       DeploymentStatus @default(PLANNED)
-  createdAt    DateTime         @default(now())
+  id          String           @id @default(cuid())
+  projectId   String
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engineerId  String
+  engineer    Engineer         @relation(fields: [engineerId], references: [id])
+  role        String // e.g. "Team Leader", "Field Engineer"
+  startDate   DateTime         @db.Date
+  endDate     DateTime?        @db.Date
+  equipmentId String?
+  equipment   Equipment?       @relation(fields: [equipmentId], references: [id])
+  status      DeploymentStatus @default(PLANNED)
+  createdAt   DateTime         @default(now())
 
   @@index([projectId])
   @@index([engineerId])
@@ -349,22 +349,22 @@ model Deployment {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model LogSheetEntry {
-  id                       String      @id @default(cuid())
-  projectId                String
-  project                  Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  engineerId               String
-  engineer                 Engineer    @relation(fields: [engineerId], references: [id])
-  date                     DateTime    @db.Date
-  clockIn                  DateTime?   // UTC; display in IST
-  clockOut                 DateTime?   // UTC; display in IST
-  totalHours               Float       @default(0) // Auto-calc: clockOut - clockIn in hours
-  extraHours               Float       @default(0) // Hours beyond standard 8-hour shift
-  dailyStatus              DailyStatus
-  progressRemarks          String?
-  reportStatus             String?     // Material Inspection / Site Not Ready / etc.
+  id                        String      @id @default(cuid())
+  projectId                 String
+  project                   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engineerId                String
+  engineer                  Engineer    @relation(fields: [engineerId], references: [id])
+  date                      DateTime    @db.Date
+  clockIn                   DateTime? // UTC; display in IST
+  clockOut                  DateTime? // UTC; display in IST
+  totalHours                Float       @default(0) // Auto-calc: clockOut - clockIn in hours
+  extraHours                Float       @default(0) // Hours beyond standard 8-hour shift
+  dailyStatus               DailyStatus
+  progressRemarks           String?
+  reportStatus              String? // Material Inspection / Site Not Ready / etc.
   clientCountersignatureUrl String?
-  createdAt                DateTime    @default(now())
-  updatedAt                DateTime    @updatedAt
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
 
   @@unique([projectId, engineerId, date])
   @@index([projectId])
@@ -373,21 +373,21 @@ model LogSheetEntry {
 }
 
 model ExpenseClaim {
-  id             String          @id @default(cuid())
-  projectId      String
-  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  engineerId     String
-  engineer       Engineer        @relation(fields: [engineerId], references: [id])
-  category       ExpenseCategory
-  amount         Decimal         @db.Decimal(10, 2)
-  description    String?
-  receiptUrl     String?
-  approvedByPM   Boolean         @default(false)
-  rejectedByPM   Boolean         @default(false)
+  id              String          @id @default(cuid())
+  projectId       String
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  engineerId      String
+  engineer        Engineer        @relation(fields: [engineerId], references: [id])
+  category        ExpenseCategory
+  amount          Decimal         @db.Decimal(10, 2)
+  description     String?
+  receiptUrl      String?
+  approvedByPM    Boolean         @default(false)
+  rejectedByPM    Boolean         @default(false)
   rejectionReason String?
-  approvedAt     DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  approvedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@index([projectId])
   @@index([engineerId])
@@ -445,10 +445,10 @@ model Invoice {
   totalAmount          Decimal       @db.Decimal(15, 2)
   status               InvoiceStatus @default(DRAFT)
   sentDate             DateTime?
-  sentMethod           String?       // "EMAIL" | "PORTAL" | "BOTH"
+  sentMethod           String? // "EMAIL" | "PORTAL" | "BOTH"
   workingSheetUrl      String?
   dueDate              DateTime?     @db.Date
-  balanceDue           Decimal       @db.Decimal(15, 2) @default(0)
+  balanceDue           Decimal       @default(0) @db.Decimal(15, 2)
   createdById          String
   createdBy            User          @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
   accountsReviewedById String?
@@ -458,8 +458,8 @@ model Invoice {
   updatedAt            DateTime      @updatedAt
 
   // Relations
-  payments             Payment[]
-  reminders            PaymentReminder[]
+  payments  Payment[]
+  reminders PaymentReminder[]
 
   @@index([projectId])
   @@index([poId])
@@ -493,7 +493,7 @@ model PaymentReminder {
   channel     ReminderChannel @default(EMAIL)
   draftBody   String
   status      ReminderStatus  @default(PENDING)
-  dayOffset   Int             // +7, +14, +21, +30, +45 days after invoice sent
+  dayOffset   Int // +7, +14, +21, +30, +45 days after invoice sent
   createdAt   DateTime        @default(now())
 
   @@index([invoiceId])
@@ -514,20 +514,20 @@ model ComplianceDocType {
   createdAt            DateTime @default(now())
 
   // Relations
-  documents            ComplianceDocument[]
-  clientRequirements   ClientComplianceRequirement[]
-  projectDocs          ProjectComplianceDoc[]
+  documents          ComplianceDocument[]
+  clientRequirements ClientComplianceRequirement[]
+  projectDocs        ProjectComplianceDoc[]
 }
 
 /// Per-client configuration of which doc types are mandatory
 model ClientComplianceRequirement {
-  id           String            @id @default(cuid())
-  clientId     String
-  client       Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  docTypeId    String
-  docType      ComplianceDocType @relation(fields: [docTypeId], references: [id], onDelete: Cascade)
-  isMandatory  Boolean           @default(true)
-  createdAt    DateTime          @default(now())
+  id          String            @id @default(cuid())
+  clientId    String
+  client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  docTypeId   String
+  docType     ComplianceDocType @relation(fields: [docTypeId], references: [id], onDelete: Cascade)
+  isMandatory Boolean           @default(true)
+  createdAt   DateTime          @default(now())
 
   @@unique([clientId, docTypeId])
 }
@@ -597,19 +597,19 @@ model ProjectComplianceDoc {
 
 model AuditLog {
   id            String   @id @default(cuid())
-  entityType    String   // "Project" | "Invoice" | "Payment" | "ComplianceDocument" | etc.
+  entityType    String // "Project" | "Invoice" | "Payment" | "ComplianceDocument" | etc.
   entityId      String
-  action        String   // "STATUS_CHANGED" | "CREATED" | "UPDATED" | "DELETED" | "APPROVED" | etc.
+  action        String // "STATUS_CHANGED" | "CREATED" | "UPDATED" | "DELETED" | "APPROVED" | etc.
   performedById String
   performedBy   User     @relation(fields: [performedById], references: [id])
   oldValue      Json?
   newValue      Json?
-  description   String?  // Human-readable description of the change
+  description   String? // Human-readable description of the change
   timestamp     DateTime @default(now())
 
   // Optional project relation for project-scoped audit views
-  projectId     String?
-  project       Project? @relation("ProjectAuditLogs", fields: [projectId], references: [id])
+  projectId String?
+  project   Project? @relation("ProjectAuditLogs", fields: [projectId], references: [id])
 
   @@index([entityType, entityId])
   @@index([performedById])
@@ -623,7 +623,7 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   body      String
-  link      String?  // Deep link to relevant entity
+  link      String? // Deep link to relevant entity
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 

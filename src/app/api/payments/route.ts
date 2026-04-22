@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute } from "@/lib/utils/permissions";
+import { getPermissionOverrides, guardRoute } from "@/lib/utils/permissions";
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +10,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "payment:view");
+    const guard = guardRoute(
+      session.user.roles,
+      "payment:view",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const { searchParams } = new URL(req.url);

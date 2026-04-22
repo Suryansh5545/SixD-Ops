@@ -6,7 +6,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute, sanitiseText } from "@/lib/utils/permissions";
+import {
+  getPermissionOverrides,
+  guardRoute,
+  sanitiseText,
+} from "@/lib/utils/permissions";
 import { ApproveExpenseSchema } from "@/lib/validations/expense";
 import { NotificationService } from "@/lib/services/NotificationService";
 
@@ -19,7 +23,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "expense:approve");
+    const guard = guardRoute(
+      session.user.roles,
+      "expense:approve",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const body = await req.json();

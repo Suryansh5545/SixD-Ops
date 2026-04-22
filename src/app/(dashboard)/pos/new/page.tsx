@@ -24,7 +24,7 @@ const schema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   expectedWorkingDays: z.coerce.number().int().positive("Working days must be positive"),
-  assignedPMId: z.string().min(1, "Project manager is required"),
+  assignedPMId: z.string().min(1, "Business manager is required"),
   paymentTerms: z.enum(["NET_30", "NET_45", "CUSTOM"]).default("NET_30"),
   customPaymentDays: z.coerce.number().int().positive().optional(),
   division: z.enum(["TS", "LSS"]),
@@ -61,9 +61,9 @@ export default function NewPOPage() {
   });
 
   const { data: managers = [] } = useQuery<UserOption[]>({
-    queryKey: ["project-managers"],
+    queryKey: ["business-managers"],
     queryFn: async () => {
-      const res = await fetch("/api/users?role=PROJECT_MANAGER", { cache: "no-store" });
+      const res = await fetch("/api/users?role=BUSINESS_MANAGER", { cache: "no-store" });
       if (!res.ok) return [];
 
       const json = await res.json().catch(() => null);
@@ -246,13 +246,13 @@ export default function NewPOPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="assignedPMId">Assigned PM *</Label>
+                <Label htmlFor="assignedPMId">Assigned Business Manager *</Label>
                 <select
                   id="assignedPMId"
                   className="flex h-9 w-full appearance-none rounded-lg border border-input bg-transparent px-3 py-1 pr-8 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   {...register("assignedPMId")}
                 >
-                  <option value="">Select PM...</option>
+                  <option value="">Select business manager...</option>
                   {managers.map((manager) => (
                     <option key={manager.id} value={manager.id}>
                       {manager.name}

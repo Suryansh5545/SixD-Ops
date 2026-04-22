@@ -236,7 +236,7 @@ export default function ProjectDetailPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             <strong>Quota alert:</strong> {project.daysConsumed} of {project.expectedWorkingDays} days consumed ({Math.round(quotaPct)}%).
-            Contact PM to review scope or raise PO amendment.
+            Contact the business manager to review scope or raise a PO amendment.
           </AlertDescription>
         </Alert>
       )}
@@ -403,7 +403,7 @@ export default function ProjectDetailPage() {
                     <p className="font-medium text-sm">{project.projectManager.name}</p>
                     <p className="text-xs text-muted-foreground">{project.projectManager.email}</p>
                   </div>
-                  <Badge variant="brand">Project Manager</Badge>
+                  <Badge variant="brand">Business Manager</Badge>
                 </CardContent>
               </Card>
             )}

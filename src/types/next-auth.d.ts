@@ -13,6 +13,8 @@ declare module "next-auth" {
       id: string;
       role: Role;
       roles: Role[];
+      permissionGrants: string[];
+      permissionRevokes: string[];
       isActive: boolean;
     } & DefaultSession["user"];
   }
@@ -21,6 +23,8 @@ declare module "next-auth" {
     id: string;
     role: Role;
     roles: Role[];
+    permissionGrants: string[];
+    permissionRevokes: string[];
     isActive: boolean;
   }
 }
@@ -30,6 +34,8 @@ declare module "next-auth/jwt" {
     id: string;
     role: Role;
     roles: Role[];
+    permissionGrants: string[];
+    permissionRevokes: string[];
     isActive: boolean;
   }
 }

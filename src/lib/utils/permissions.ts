@@ -4,7 +4,11 @@
  */
 
 import type { Role } from "@prisma/client";
-import { hasPermission, type Permission } from "@/lib/rbac";
+import {
+  hasPermission,
+  type Permission,
+  type PermissionOverrideSet,
+} from "@/lib/rbac";
 
 /**
  * Returns a 403 JSON response object for use in API routes.
@@ -34,11 +38,22 @@ export function unauthorized(): Response {
  */
 export function guardRoute(
   userRoles: Role[] | undefined | null,
-  permission: Permission
+  permission: Permission,
+  overrides?: PermissionOverrideSet
 ): Response | null {
   if (!userRoles || userRoles.length === 0) return unauthorized();
-  if (!hasPermission(userRoles, permission)) return forbidden();
+  if (!hasPermission(userRoles, permission, overrides)) return forbidden();
   return null;
+}
+
+export function getPermissionOverrides(user?: {
+  permissionGrants?: string[] | null;
+  permissionRevokes?: string[] | null;
+} | null): PermissionOverrideSet {
+  return {
+    grants: user?.permissionGrants ?? [],
+    revokes: user?.permissionRevokes ?? [],
+  };
 }
 
 /**

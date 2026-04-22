@@ -21,7 +21,7 @@ export const CreatePOSchema = z.object({
   paymentTerms: z.nativeEnum(PaymentTerms),
   customPaymentDays: z.number().int().positive().optional().nullable(),
   invoiceType: z.nativeEnum(InvoiceType),
-  assignedPMId: z.string().min(1, "Project Manager is required"),
+  assignedPMId: z.string().min(1, "Business Manager is required"),
   workStartDate: z.string().optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
 });

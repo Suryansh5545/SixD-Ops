@@ -211,7 +211,7 @@ export default function PODetailPage() {
             <div className="rounded-xl border bg-muted/30 p-4">
               <div className="flex items-center gap-2">
                 <UserCircle2 className="h-4 w-4 text-muted-foreground" />
-                <p className="font-medium">Assigned PM</p>
+                <p className="font-medium">Assigned Business Manager</p>
               </div>
               <p className="mt-3">{po.assignedPM?.name ?? "Not assigned"}</p>
               <p className="text-xs text-muted-foreground">{po.assignedPM?.email ?? "No email available"}</p>

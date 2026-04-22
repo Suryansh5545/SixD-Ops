@@ -27,9 +27,15 @@ export function RoleGuard({ permission, anyPermission, fallback = null, children
   let allowed = false;
 
   if (permission) {
-    allowed = hasPermission(userRoles, permission);
+    allowed = hasPermission(userRoles, permission, {
+      grants: session?.user?.permissionGrants ?? [],
+      revokes: session?.user?.permissionRevokes ?? [],
+    });
   } else if (anyPermission) {
-    allowed = hasAnyPermission(userRoles, anyPermission);
+    allowed = hasAnyPermission(userRoles, anyPermission, {
+      grants: session?.user?.permissionGrants ?? [],
+      revokes: session?.user?.permissionRevokes ?? [],
+    });
   } else {
     allowed = true; // No restriction specified
   }

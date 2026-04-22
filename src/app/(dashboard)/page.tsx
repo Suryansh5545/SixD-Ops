@@ -14,12 +14,10 @@ const ROLE_DASHBOARD_MAP: Partial<Record<Role, string>> = {
   MD: "/dashboard/md",
   CFO: "/dashboard/cfo",
   BUSINESS_HEAD: "/dashboard/bh",
-  PROJECT_MANAGER: "/dashboard/pm",
-  BUSINESS_MANAGER_STEEL: "/dashboard/bh",
-  BUSINESS_MANAGER_TATA_GOVT: "/dashboard/bh",
+  BUSINESS_MANAGER: "/dashboard/pm",
   FIELD_ENGINEER: "/projects",
   BD_TEAM: "/pos",
-  ADMIN_COORDINATOR: "/projects",
+  SALES_TEAM: "/pos",
   ACCOUNTS: "/invoices",
 };
 

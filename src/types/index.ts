@@ -48,6 +48,8 @@ export interface SessionUser {
   email: string;
   role: Role;
   roles: Role[];
+  permissionGrants: string[];
+  permissionRevokes: string[];
   isActive: boolean;
 }
 
@@ -383,13 +385,11 @@ export const ROLE_LABELS: Record<Role, string> = {
   MD: "Managing Director",
   CFO: "CFO",
   BUSINESS_HEAD: "Business Head",
-  BUSINESS_MANAGER_STEEL: "Business Manager – Steel",
-  BUSINESS_MANAGER_TATA_GOVT: "Business Manager – TATA & Govt",
-  BD_TEAM: "BD Team",
-  PROJECT_MANAGER: "Project Manager",
-  FIELD_ENGINEER: "Field Engineer",
-  ADMIN_COORDINATOR: "Admin Coordinator",
   ACCOUNTS: "Accounts",
+  BD_TEAM: "BD Team",
+  BUSINESS_MANAGER: "Business Manager",
+  SALES_TEAM: "Sales Team",
+  FIELD_ENGINEER: "Field Engineer",
 };
 
 export const STANDARD_SHIFT_HOURS = 8; // Hours per day before extra hours kick in

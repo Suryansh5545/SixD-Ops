@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
+import { getPermissionOverrides } from "@/lib/utils/permissions";
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,7 +23,11 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search");
     const skip = (page - 1) * limit;
 
-    const canViewAll = hasPermission(session.user.roles, "invoice:view_all");
+    const canViewAll = hasPermission(
+      session.user.roles,
+      "invoice:view_all",
+      getPermissionOverrides(session.user)
+    );
     const isEngineer = session.user.roles.includes("FIELD_ENGINEER" as import("@prisma/client").Role);
 
     if (isEngineer) {

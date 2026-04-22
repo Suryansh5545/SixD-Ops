@@ -5,7 +5,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { EmailService } from "@/lib/services/EmailService";
-import { guardRoute } from "@/lib/utils/permissions";
+import { getPermissionOverrides, guardRoute } from "@/lib/utils/permissions";
 
 const CreateEngineerSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -158,7 +158,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "team:manage");
+    const guard = guardRoute(
+      session.user.roles,
+      "team:manage",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const body = await req.json();
@@ -227,9 +231,11 @@ export async function POST(req: NextRequest) {
       return createdEngineer;
     });
 
+    let inviteEmailSent: boolean | null = null;
+
     if (engineer.user.isActive) {
       const baseUrl = process.env.APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-      await EmailService.sendTeamInvite({
+      inviteEmailSent = await EmailService.sendTeamInvite({
         to: engineer.user.email,
         name: engineer.user.name,
         division: engineer.division,
@@ -241,7 +247,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, data: engineer }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        data: engineer,
+        inviteEmailSent,
+        warnings:
+          inviteEmailSent === false
+            ? ["Engineer created, but the invite email could not be sent."]
+            : [],
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("[POST /api/engineers]", error);
     if ((error as { code?: string }).code === "P2002") {

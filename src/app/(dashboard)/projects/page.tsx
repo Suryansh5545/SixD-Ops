@@ -42,7 +42,6 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Projects</h1>
@@ -58,34 +57,45 @@ export default function ProjectsPage() {
         </RoleGuard>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search projects, clients, PO..."
             className="pl-9"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
-        <Select value={status} onValueChange={(v) => { setStatus(v === "all" ? "" : v); setPage(1); }}>
+        <Select
+          value={status}
+          onValueChange={(value) => {
+            setStatus(value === "all" ? "" : value);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-full sm:w-56">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
             {Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>{label}</SelectItem>
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Project list */}
       {isLoading ? (
         <div className="space-y-3">
-          {[...Array(5)].map((_, i) => <div key={i} className="skeleton h-28 rounded-xl" />)}
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="skeleton h-28 rounded-xl" />
+          ))}
         </div>
       ) : projects.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
@@ -117,14 +127,18 @@ export default function ProjectsPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-sm">{proj.name}</span>
                     {proj.isBlocked && (
-                      <Badge variant="destructive" className="text-xs">BLOCKED</Badge>
+                      <Badge variant="destructive" className="text-xs">
+                        BLOCKED
+                      </Badge>
                     )}
                     {proj.division && (
-                      <Badge variant="secondary" className="text-xs">{proj.division}</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {proj.division}
+                      </Badge>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {proj.client.name} · PM: {proj.pm.name} · {proj.po.internalId}
+                    {proj.client.name} · Business Manager: {proj.pm.name} · {proj.po.internalId}
                   </p>
                   <p className="text-xs text-muted-foreground">Updated {formatDate(proj.updatedAt)}</p>
                 </div>
@@ -136,7 +150,6 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-4">
           <Button

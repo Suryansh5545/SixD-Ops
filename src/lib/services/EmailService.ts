@@ -25,15 +25,50 @@ interface SendEmailOptions {
 class EmailServiceClass {
   private transporter: nodemailer.Transporter | null = null;
 
+  private getSmtpConfig() {
+    const port = parseInt(process.env.SMTP_PORT ?? "587", 10);
+    const secureEnv = process.env.SMTP_SECURE?.trim().toLowerCase();
+
+    let secure =
+      secureEnv === "true" ? true : secureEnv === "false" ? false : port === 465;
+
+    // Common SMTP ports:
+    // 465 -> implicit TLS (`secure: true`)
+    // 587 -> STARTTLS upgrade (`secure: false`)
+    if (port === 587 && secure) {
+      console.warn(
+        "[EmailService] SMTP_SECURE=true is incompatible with port 587. Falling back to secure=false for STARTTLS."
+      );
+      secure = false;
+    } else if (port === 465 && !secure) {
+      console.warn(
+        "[EmailService] SMTP_SECURE=false is incompatible with port 465. Falling back to secure=true."
+      );
+      secure = true;
+    }
+
+    return {
+      host: process.env.SMTP_HOST,
+      port,
+      secure,
+    };
+  }
+
   /**
    * Lazily initialises the SMTP transporter on first use.
    */
   private getTransporter(): nodemailer.Transporter {
     if (!this.transporter) {
+      const smtpConfig = this.getSmtpConfig();
+
       this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT ?? "587", 10),
-        secure: process.env.SMTP_SECURE === "true",
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.secure,
+        requireTLS: !smtpConfig.secure,
+        tls: {
+          minVersion: "TLSv1.2",
+        },
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS,

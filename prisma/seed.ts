@@ -8,8 +8,12 @@
  * Default PIN (field engineers): 123456
  */
 
+import { loadEnvConfig } from "@next/env";
 import { PrismaClient, Role, Division, EngineerLevel, IndustrySector, PaymentTerms } from "@prisma/client";
 import bcrypt from "bcryptjs";
+
+// Standalone tsx/node execution does not get Next.js env loading for free.
+loadEnvConfig(process.cwd());
 
 const prisma = new PrismaClient();
 
@@ -52,8 +56,8 @@ async function main() {
     name: "Nidhi Bharti",
     email: "nidhi.bharti@sixdengineering.com",
     passwordHash,
-    role: Role.BUSINESS_MANAGER_STEEL,
-    roles: [Role.BUSINESS_MANAGER_STEEL],
+    role: Role.BUSINESS_MANAGER,
+    roles: [Role.BUSINESS_MANAGER],
   });
 
   // Syed Ali — dual role: primary PM + secondary BM_TATA_GOVT
@@ -61,24 +65,24 @@ async function main() {
     name: "Syed Ali",
     email: "syed.ali@sixdengineering.com",
     passwordHash,
-    role: Role.PROJECT_MANAGER,
-    roles: [Role.PROJECT_MANAGER, Role.BUSINESS_MANAGER_TATA_GOVT],
+    role: Role.BUSINESS_MANAGER,
+    roles: [Role.BUSINESS_MANAGER],
   });
 
   const gaurav = await upsertUser({
     name: "Gaurav",
     email: "gaurav@sixdengineering.com",
     passwordHash,
-    role: Role.PROJECT_MANAGER,
-    roles: [Role.PROJECT_MANAGER],
+    role: Role.BUSINESS_MANAGER,
+    roles: [Role.BUSINESS_MANAGER],
   });
 
   const suraj = await upsertUser({
     name: "Suraj Pandey",
     email: "suraj.pandey@sixdengineering.com",
     passwordHash,
-    role: Role.BD_TEAM,
-    roles: [Role.BD_TEAM],
+    role: Role.SALES_TEAM,
+    roles: [Role.SALES_TEAM],
   });
 
   const yash = await upsertUser({
@@ -90,11 +94,11 @@ async function main() {
   });
 
   const adminCoordinator = await upsertUser({
-    name: "Admin Coordinator",
+    name: "Operations Coordinator",
     email: "admin@sixdengineering.com",
     passwordHash,
-    role: Role.ADMIN_COORDINATOR,
-    roles: [Role.ADMIN_COORDINATOR],
+    role: Role.BUSINESS_HEAD,
+    roles: [Role.BUSINESS_HEAD],
   });
 
   const accounts = await upsertUser({

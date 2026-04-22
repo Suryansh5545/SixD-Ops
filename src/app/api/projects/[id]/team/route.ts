@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute } from "@/lib/utils/permissions";
+import { getPermissionOverrides, guardRoute } from "@/lib/utils/permissions";
 import { AssignTeamSchema, type AssignTeamInput } from "@/lib/validations/project";
 import { NotificationService } from "@/lib/services/NotificationService";
 
@@ -84,7 +84,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "planning:assign_team");
+    const guard = guardRoute(
+      session.user.roles,
+      "planning:assign_team",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const body = await req.json();
@@ -256,7 +260,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return { created, project };
     });
 
-    // Notify division head and admin coordinator
+    // Notify division head and business head
     const project = await prisma.project.findUnique({
       where: { id: params.id },
       select: { name: true, division: true },
@@ -276,14 +280,17 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         await NotificationService.notifyTeamAssigned(head.user.id, project.name, params.id);
       }
 
-      // Notify admin coordinators
-      const adminCoordinators = await prisma.user.findMany({
-        where: { role: "ADMIN_COORDINATOR", isActive: true },
+      // Notify business heads for travel planning coordination.
+      const businessHeads = await prisma.user.findMany({
+        where: {
+          OR: [{ role: "BUSINESS_HEAD" }, { roles: { has: "BUSINESS_HEAD" } }],
+          isActive: true,
+        },
         select: { id: true },
       });
 
-      for (const coord of adminCoordinators) {
-        await NotificationService.notifyTravelPlanningNeeded(coord.id, project.name, params.id);
+      for (const head of businessHeads) {
+        await NotificationService.notifyTravelPlanningNeeded(head.id, project.name, params.id);
       }
     }
 

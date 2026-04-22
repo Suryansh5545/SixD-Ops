@@ -81,7 +81,11 @@ export async function GET(req: NextRequest) {
         if (reminder.dayOffset >= 21) {
           const leaders = await prisma.user.findMany({
             where: {
-              role: { in: ["MD", "BUSINESS_HEAD"] },
+              OR: [
+                { role: { in: ["MD", "BUSINESS_HEAD"] } },
+                { roles: { has: "MD" } },
+                { roles: { has: "BUSINESS_HEAD" } },
+              ],
               isActive: true,
             },
             select: { id: true },

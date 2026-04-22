@@ -6,7 +6,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute, sanitiseText } from "@/lib/utils/permissions";
+import {
+  getPermissionOverrides,
+  guardRoute,
+  sanitiseText,
+} from "@/lib/utils/permissions";
 import { CreateExpenseSchema, ApproveExpenseSchema } from "@/lib/validations/expense";
 import { NotificationService } from "@/lib/services/NotificationService";
 import { StorageService } from "@/lib/services/StorageService";
@@ -59,7 +63,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "expense:submit");
+    const guard = guardRoute(
+      session.user.roles,
+      "expense:submit",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const engineer = await prisma.engineer.findUnique({ where: { userId: session.user.id } });

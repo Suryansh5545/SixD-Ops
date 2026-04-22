@@ -7,7 +7,7 @@ export const CreateProjectSchema = z.object({
   name: z.string().min(1, "Project name is required").max(200),
   description: z.string().max(2000).optional().nullable(),
   division: z.nativeEnum(Division).optional().nullable(),
-  pmId: z.string().min(1, "Project Manager is required"),
+  pmId: z.string().min(1, "Business Manager is required"),
   startDate: z.string().optional().nullable(),
   endDate: z.string().optional().nullable(),
   daysAuthorised: z.number().int().positive("Days authorised must be positive"),

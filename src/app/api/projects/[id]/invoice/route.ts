@@ -12,8 +12,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute } from "@/lib/utils/permissions";
-import { generateInternalId } from "@/lib/utils/permissions";
+import {
+  generateInternalId,
+  getPermissionOverrides,
+  guardRoute,
+} from "@/lib/utils/permissions";
 import { calcDailyRate, calcGST, toNumber } from "@/lib/utils/currency";
 import { NotificationService } from "@/lib/services/NotificationService";
 import type { InvoiceLineItem } from "@/types";
@@ -51,7 +54,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "invoice:initiate");
+    const guard = guardRoute(
+      session.user.roles,
+      "invoice:initiate",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     // Verify project exists and is at correct status

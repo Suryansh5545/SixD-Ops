@@ -25,8 +25,12 @@ export function useAuth() {
     : [];
 
   const can = useCallback(
-    (permission: Permission) => hasPermission(userRoles, permission),
-    [userRoles]
+    (permission: Permission) =>
+      hasPermission(userRoles, permission, {
+        grants: user?.permissionGrants ?? [],
+        revokes: user?.permissionRevokes ?? [],
+      }),
+    [user?.permissionGrants, user?.permissionRevokes, userRoles]
   );
 
   const logout = useCallback(async () => {

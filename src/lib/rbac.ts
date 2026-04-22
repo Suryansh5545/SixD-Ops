@@ -1,102 +1,103 @@
 /**
- * Role-Based Access Control (RBAC) Matrix
+ * Role-Based Access Control (RBAC) matrix.
  *
- * Centralised permission definitions. Used by:
- *  - API route handlers (server-side enforcement)
- *  - <RoleGuard> component (UI-level conditional rendering)
- *
- * Permission check: hasPermission(userRoles, "invoice:initiate")
+ * This file stays code-first for default role permissions, while the database
+ * now supports direct per-user grants/revokes through User.permissionGrants
+ * and User.permissionRevokes.
  */
 
 import type { Role } from "@prisma/client";
 
-// ─── PERMISSION KEYS ──────────────────────────────────────────────────────────
+export const PERMISSIONS = [
+  "po:create",
+  "po:view_all",
+  "po:view_own",
+  "po:edit",
+  "po:delete",
+  "project:create",
+  "project:view_all",
+  "project:view_own",
+  "project:manage",
+  "project:update_status",
+  "planning:assign_team",
+  "planning:assign_equipment",
+  "planning:manage_travel",
+  "logsheet:submit",
+  "logsheet:view_own",
+  "logsheet:view_project",
+  "logsheet:view_all",
+  "logsheet:edit_any",
+  "expense:submit",
+  "expense:approve",
+  "expense:view_project",
+  "expense:view_all",
+  "mom:create",
+  "report:submit",
+  "invoice:initiate",
+  "invoice:view_own_project",
+  "invoice:view_all",
+  "invoice:review",
+  "invoice:approve",
+  "invoice:send",
+  "invoice:edit",
+  "payment:record",
+  "payment:view",
+  "compliance:manage",
+  "compliance:view",
+  "compliance:upload",
+  "client:view",
+  "client:manage",
+  "notification:view_own",
+  "dashboard:md",
+  "dashboard:cfo",
+  "dashboard:bh",
+  "dashboard:bm",
+  "settings:manage",
+  "settings:view",
+  "team:manage",
+  "team:view_all",
+  "team:view_own_division",
+  "team:edit_access",
+  "team:assign_roles",
+  "team:assign_permissions",
+  "audit:view",
+] as const;
 
-export type Permission =
-  // PO
-  | "po:create"
-  | "po:view_all"
-  | "po:view_own"
-  | "po:edit"
-  | "po:delete"
-  // Project
-  | "project:create"
-  | "project:view_all"
-  | "project:view_own"
-  | "project:manage"
-  | "project:update_status"
-  // Planning
-  | "planning:assign_team"
-  | "planning:assign_equipment"
-  // Log Sheet
-  | "logsheet:submit"
-  | "logsheet:view_own"
-  | "logsheet:view_project"
-  | "logsheet:view_all"
-  | "logsheet:edit_any"
-  // Expense
-  | "expense:submit"
-  | "expense:approve"
-  | "expense:view_project"
-  | "expense:view_all"
-  // MOM & Report
-  | "mom:create"
-  | "report:submit"
-  // Invoice
-  | "invoice:initiate"
-  | "invoice:view_own_project"
-  | "invoice:view_all"
-  | "invoice:review"
-  | "invoice:approve"
-  | "invoice:send"
-  | "invoice:edit"
-  // Payment
-  | "payment:record"
-  | "payment:view"
-  // Compliance
-  | "compliance:manage"
-  | "compliance:view"
-  | "compliance:upload"
-  // Notifications
-  | "notification:view_own"
-  // Dashboard
-  | "dashboard:md"
-  | "dashboard:cfo"
-  | "dashboard:bh"
-  | "dashboard:pm"
-  // Settings
-  | "settings:manage"
-  | "settings:view"
-  // Team / Engineers
-  | "team:manage"
-  | "team:view_all"
-  | "team:view_own_division"
-  // Audit
-  | "audit:view";
+export type Permission = (typeof PERMISSIONS)[number];
 
-// ─── RBAC MATRIX ─────────────────────────────────────────────────────────────
+export interface PermissionOverrideSet {
+  grants?: string[] | null;
+  revokes?: string[] | null;
+}
+
+export const ROLE_HIERARCHY: Role[] = [
+  "MD",
+  "CFO",
+  "BUSINESS_HEAD",
+  "ACCOUNTS",
+  "BUSINESS_MANAGER",
+  "BD_TEAM",
+  "SALES_TEAM",
+  "FIELD_ENGINEER",
+];
+
+const ALL_PERMISSIONS = [...PERMISSIONS];
+const PERMISSION_SET = new Set<string>(PERMISSIONS);
+
+export function isPermission(value: string): value is Permission {
+  return PERMISSION_SET.has(value);
+}
+
+function normaliseOverrideValues(values?: string[] | null): Permission[] {
+  if (!values || values.length === 0) return [];
+  return values.filter(isPermission);
+}
 
 /**
- * Maps each Role to the set of Permissions it holds.
- * Add a permission to a role's array to grant it.
+ * Maps each role to its default permissions.
  */
-const RBAC_MATRIX: Record<Role, Permission[]> = {
-  MD: [
-    "po:create", "po:view_all", "po:edit", "po:delete",
-    "project:create", "project:view_all", "project:manage", "project:update_status",
-    "planning:assign_team", "planning:assign_equipment",
-    "logsheet:submit", "logsheet:view_own", "logsheet:view_project", "logsheet:view_all", "logsheet:edit_any",
-    "expense:submit", "expense:approve", "expense:view_project", "expense:view_all",
-    "mom:create", "report:submit",
-    "invoice:initiate", "invoice:view_own_project", "invoice:view_all", "invoice:review", "invoice:approve", "invoice:send", "invoice:edit",
-    "payment:record", "payment:view",
-    "compliance:manage", "compliance:view", "compliance:upload",
-    "notification:view_own",
-    "dashboard:md", "dashboard:cfo", "dashboard:bh", "dashboard:pm",
-    "settings:manage", "settings:view",
-    "team:manage", "team:view_all",
-    "audit:view",
-  ],
+export const ROLE_PERMISSION_MATRIX: Record<Role, Permission[]> = {
+  MD: [...ALL_PERMISSIONS],
 
   CFO: [
     "po:view_all",
@@ -106,143 +107,180 @@ const RBAC_MATRIX: Record<Role, Permission[]> = {
     "invoice:view_all",
     "payment:view",
     "compliance:view",
+    "client:view",
     "notification:view_own",
     "dashboard:cfo",
     "settings:view",
-    "team:view_all",
     "audit:view",
   ],
 
   BUSINESS_HEAD: [
-    "po:create", "po:view_all", "po:edit",
+    "po:create",
+    "po:view_all",
+    "po:edit",
+    "project:create",
     "project:view_all",
+    "project:manage",
+    "project:update_status",
+    "planning:assign_team",
+    "planning:assign_equipment",
+    "planning:manage_travel",
     "logsheet:view_all",
+    "expense:approve",
     "expense:view_all",
+    "mom:create",
+    "report:submit",
+    "invoice:initiate",
     "invoice:view_all",
+    "invoice:edit",
     "payment:view",
+    "compliance:manage",
     "compliance:view",
+    "compliance:upload",
+    "client:view",
+    "client:manage",
     "notification:view_own",
     "dashboard:bh",
     "settings:view",
-    "team:manage", "team:view_all",
-    "audit:view",
-  ],
-
-  BUSINESS_MANAGER_STEEL: [
-    "po:create", "po:view_own",
-    "project:view_own",
-    "invoice:view_own_project",
-    "compliance:manage", "compliance:view", "compliance:upload",
-    "notification:view_own",
-    "team:view_own_division",
-    "audit:view",
-  ],
-
-  BUSINESS_MANAGER_TATA_GOVT: [
-    "po:create", "po:view_own",
-    "project:view_own",
-    "invoice:view_own_project",
-    "compliance:manage", "compliance:view", "compliance:upload",
-    "notification:view_own",
-    "team:view_own_division",
-    "audit:view",
-  ],
-
-  BD_TEAM: [
-    "po:create", "po:view_own",
-    "project:view_own",
-    "notification:view_own",
-  ],
-
-  PROJECT_MANAGER: [
-    "po:view_own",
-    "project:create", "project:view_own", "project:manage", "project:update_status",
-    "planning:assign_team", "planning:assign_equipment",
-    "logsheet:view_project",
-    "expense:approve", "expense:view_project",
-    "mom:create", "report:submit",
-    "invoice:initiate", "invoice:view_own_project", "invoice:edit",
-    "payment:view",
-    "compliance:view",
-    "notification:view_own",
-    "dashboard:pm",
-    "team:view_own_division",
-    "audit:view",
-  ],
-
-  FIELD_ENGINEER: [
-    "logsheet:submit", "logsheet:view_own",
-    "expense:submit",
-    "notification:view_own",
-  ],
-
-  ADMIN_COORDINATOR: [
-    "project:view_all",
     "team:manage",
     "team:view_all",
-    "notification:view_own",
-    "settings:view",
+    "team:edit_access",
+    "team:assign_roles",
+    "audit:view",
   ],
 
   ACCOUNTS: [
     "po:view_all",
     "project:view_all",
-    "invoice:view_all", "invoice:review", "invoice:approve", "invoice:send",
-    "payment:record", "payment:view",
+    "invoice:view_all",
+    "invoice:review",
+    "invoice:approve",
+    "invoice:send",
+    "invoice:edit",
+    "payment:record",
+    "payment:view",
     "compliance:view",
+    "client:view",
     "notification:view_own",
     "settings:view",
     "audit:view",
   ],
+
+  BD_TEAM: [
+    "po:create",
+    "po:view_own",
+    "client:view",
+    "client:manage",
+    "notification:view_own",
+    "settings:view",
+  ],
+
+  BUSINESS_MANAGER: [
+    "po:create",
+    "po:view_own",
+    "project:create",
+    "project:view_own",
+    "project:manage",
+    "project:update_status",
+    "planning:assign_team",
+    "planning:assign_equipment",
+    "planning:manage_travel",
+    "logsheet:view_project",
+    "expense:approve",
+    "expense:view_project",
+    "mom:create",
+    "report:submit",
+    "invoice:initiate",
+    "invoice:view_own_project",
+    "invoice:edit",
+    "payment:view",
+    "compliance:manage",
+    "compliance:view",
+    "compliance:upload",
+    "client:view",
+    "notification:view_own",
+    "dashboard:bm",
+    "settings:view",
+    "team:view_own_division",
+    "audit:view",
+  ],
+
+  SALES_TEAM: [
+    "po:create",
+    "po:view_own",
+    "client:view",
+    "notification:view_own",
+    "settings:view",
+  ],
+
+  FIELD_ENGINEER: [
+    "logsheet:submit",
+    "logsheet:view_own",
+    "expense:submit",
+    "notification:view_own",
+    "settings:view",
+  ],
 };
 
-// ─── PERMISSION CHECK HELPERS ─────────────────────────────────────────────────
+export function hasPermission(
+  userRoles: Role[],
+  permission: Permission,
+  overrides?: PermissionOverrideSet
+): boolean {
+  const grants = new Set(normaliseOverrideValues(overrides?.grants));
+  const revokes = new Set(normaliseOverrideValues(overrides?.revokes));
 
-/**
- * Returns true if any of the user's roles grants the requested permission.
- *
- * @param userRoles - Array of Role values from the user's session (supports multi-role)
- * @param permission - The permission to check
- */
-export function hasPermission(userRoles: Role[], permission: Permission): boolean {
-  return userRoles.some((role) =>
-    RBAC_MATRIX[role]?.includes(permission) ?? false
-  );
+  if (grants.has(permission)) return true;
+  if (revokes.has(permission)) return false;
+
+  return userRoles.some((role) => ROLE_PERMISSION_MATRIX[role]?.includes(permission) ?? false);
 }
 
-/**
- * Returns true if the user has ALL of the requested permissions.
- */
-export function hasAllPermissions(userRoles: Role[], permissions: Permission[]): boolean {
-  return permissions.every((p) => hasPermission(userRoles, p));
+export function hasAllPermissions(
+  userRoles: Role[],
+  permissions: Permission[],
+  overrides?: PermissionOverrideSet
+): boolean {
+  return permissions.every((permission) => hasPermission(userRoles, permission, overrides));
 }
 
-/**
- * Returns true if the user has ANY of the requested permissions.
- */
-export function hasAnyPermission(userRoles: Role[], permissions: Permission[]): boolean {
-  return permissions.some((p) => hasPermission(userRoles, p));
+export function hasAnyPermission(
+  userRoles: Role[],
+  permissions: Permission[],
+  overrides?: PermissionOverrideSet
+): boolean {
+  return permissions.some((permission) => hasPermission(userRoles, permission, overrides));
 }
 
-/**
- * Returns all permissions a user holds (union of all their roles' permissions).
- */
-export function getUserPermissions(userRoles: Role[]): Permission[] {
-  const permSet = new Set<Permission>();
+export function getUserPermissions(
+  userRoles: Role[],
+  overrides?: PermissionOverrideSet
+): Permission[] {
+  const permissionSet = new Set<Permission>();
+
   for (const role of userRoles) {
-    for (const perm of RBAC_MATRIX[role] ?? []) {
-      permSet.add(perm);
+    for (const permission of ROLE_PERMISSION_MATRIX[role] ?? []) {
+      permissionSet.add(permission);
     }
   }
-  return Array.from(permSet);
+
+  for (const granted of normaliseOverrideValues(overrides?.grants)) {
+    permissionSet.add(granted);
+  }
+
+  for (const revoked of normaliseOverrideValues(overrides?.revokes)) {
+    permissionSet.delete(revoked);
+  }
+
+  return Array.from(permissionSet);
 }
 
-/**
- * Throws a 403 Response if the user does not have the required permission.
- * Use in API route handlers after requireAuth().
- */
-export function assertPermission(userRoles: Role[], permission: Permission): void {
-  if (!hasPermission(userRoles, permission)) {
+export function assertPermission(
+  userRoles: Role[],
+  permission: Permission,
+  overrides?: PermissionOverrideSet
+): void {
+  if (!hasPermission(userRoles, permission, overrides)) {
     throw new Response(
       JSON.stringify({ success: false, error: "Forbidden" }),
       { status: 403, headers: { "Content-Type": "application/json" } }

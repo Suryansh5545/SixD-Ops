@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { formatINR, formatCompact } from "@/lib/utils/currency";
+import { formatINR } from "@/lib/utils/currency";
 import { formatDate, daysUntilExpiry } from "@/lib/utils/date";
 
 export default function POsPage() {
@@ -57,13 +57,18 @@ export default function POsPage() {
           placeholder="Search by PO number, client..."
           className="pl-9"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
         />
       </div>
 
       {isLoading ? (
         <div className="space-y-3">
-          {[...Array(5)].map((_, i) => <div key={i} className="skeleton h-24 rounded-xl" />)}
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="skeleton h-24 rounded-xl" />
+          ))}
         </div>
       ) : pos.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
@@ -76,7 +81,19 @@ export default function POsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {pos.map((po: { id: string; internalId: string; client: { name: string }; documentType: string; referenceNumber: string; amount: string; remainingValue: string; expiryDate: string; assignedPM: { name: string }; invoiceType: string; paymentTerms: string }) => {
+          {pos.map((po: {
+            id: string;
+            internalId: string;
+            client: { name: string };
+            documentType: string;
+            referenceNumber: string;
+            amount: string;
+            remainingValue: string;
+            expiryDate: string;
+            assignedPM: { name: string };
+            invoiceType: string;
+            paymentTerms: string;
+          }) => {
             const days = daysUntilExpiry(po.expiryDate);
             const isExpiringSoon = days <= 30 && days > 0;
             const isExpired = days < 0;
@@ -91,14 +108,18 @@ export default function POsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-sm font-mono">{po.internalId}</span>
-                      <Badge variant="secondary" className="text-xs">{po.documentType.replace(/_/g, " ")}</Badge>
-                      <Badge variant="outline" className="text-xs">{po.invoiceType}</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {po.documentType.replace(/_/g, " ")}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {po.invoiceType}
+                      </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {po.client.name} · Ref: {po.referenceNumber}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      PM: {po.assignedPM.name} · {po.paymentTerms.replace(/_/g, " ")}
+                      Business Manager: {po.assignedPM.name} · {po.paymentTerms.replace(/_/g, " ")}
                     </p>
                   </div>
                   <div className="text-right shrink-0 space-y-1">
@@ -108,7 +129,9 @@ export default function POsPage() {
                     </p>
                     <div>
                       {isExpired && (
-                        <Badge variant="destructive" className="text-xs">EXPIRED</Badge>
+                        <Badge variant="destructive" className="text-xs">
+                          EXPIRED
+                        </Badge>
                       )}
                       {isExpiringSoon && !isExpired && (
                         <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">
@@ -129,11 +152,21 @@ export default function POsPage() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
-          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

@@ -163,7 +163,7 @@ export default function NewProjectPage() {
             {selectedPO && (
               <div className="space-y-1 rounded-lg bg-muted px-4 py-3 text-sm">
                 <p className="font-medium">{selectedPO.client.name}</p>
-                <p className="text-muted-foreground">Assigned PM: {selectedPO.assignedPM.name}</p>
+                <p className="text-muted-foreground">Assigned Business Manager: {selectedPO.assignedPM.name}</p>
                 <p className="text-muted-foreground">Remaining value: {selectedPO.remainingValue}</p>
               </div>
             )}

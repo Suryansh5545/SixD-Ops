@@ -7,7 +7,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute, sanitiseText } from "@/lib/utils/permissions";
+import {
+  getPermissionOverrides,
+  guardRoute,
+  sanitiseText,
+} from "@/lib/utils/permissions";
 import { UpdatePOSchema } from "@/lib/validations/po";
 
 type RouteContext = { params: { id: string } };
@@ -67,7 +71,11 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "po:edit");
+    const guard = guardRoute(
+      session.user.roles,
+      "po:edit",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const body = await req.json();
@@ -137,7 +145,11 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "po:delete");
+    const guard = guardRoute(
+      session.user.roles,
+      "po:delete",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const po = await prisma.purchaseOrder.findUnique({

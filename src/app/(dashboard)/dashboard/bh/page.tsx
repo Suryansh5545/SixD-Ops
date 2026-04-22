@@ -180,7 +180,7 @@ export default function BHDashboardPage() {
                   <th className="px-4 py-3 text-right font-medium">Amount</th>
                   <th className="px-4 py-3 text-right font-medium">Remaining</th>
                   <th className="px-4 py-3 text-left font-medium">Expiry</th>
-                  <th className="px-4 py-3 text-left font-medium">PM</th>
+                  <th className="px-4 py-3 text-left font-medium">Business Manager</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/70">

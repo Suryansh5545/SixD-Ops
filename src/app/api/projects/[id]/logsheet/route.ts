@@ -7,7 +7,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute, sanitiseText } from "@/lib/utils/permissions";
+import {
+  getPermissionOverrides,
+  guardRoute,
+  sanitiseText,
+} from "@/lib/utils/permissions";
 import { ClockInSchema, ClockOutSchema } from "@/lib/validations/logsheet";
 import { NotificationService } from "@/lib/services/NotificationService";
 import { STANDARD_SHIFT_HOURS } from "@/types";
@@ -51,7 +55,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "logsheet:submit");
+    const guard = guardRoute(
+      session.user.roles,
+      "logsheet:submit",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const body = await req.json();
@@ -176,7 +184,11 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "logsheet:submit");
+    const guard = guardRoute(
+      session.user.roles,
+      "logsheet:submit",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const body = await req.json();

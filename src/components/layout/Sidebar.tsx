@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { hasPermission } from "@/lib/rbac";
+import { hasAnyPermission, hasPermission, type Permission } from "@/lib/rbac";
 import type { Role } from "@prisma/client";
 import {
   LayoutDashboard,
@@ -25,13 +25,13 @@ const NAV_ITEMS = [
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    permission: null, // Everyone sees a dashboard
+    permission: null,
   },
   {
     label: "Purchase Orders",
     href: "/pos",
     icon: FileText,
-    permission: "po:view_all" as const,
+    anyPermission: ["po:view_all", "po:view_own", "po:create"] as Permission[],
   },
   {
     label: "Projects",
@@ -43,13 +43,13 @@ const NAV_ITEMS = [
     label: "Team",
     href: "/team",
     icon: Users,
-    permission: "team:view_all" as const,
+    anyPermission: ["team:view_all", "team:manage"] as Permission[],
   },
   {
     label: "Invoices",
     href: "/invoices",
     icon: Receipt,
-    permission: "invoice:view_all" as const,
+    anyPermission: ["invoice:view_all", "invoice:view_own_project", "invoice:initiate"] as Permission[],
   },
   {
     label: "Payments",
@@ -76,6 +76,10 @@ export function Sidebar() {
   const { data: session } = useSession();
   const userRoles = (session?.user?.roles ?? []) as Role[];
   const [collapsed, setCollapsed] = useState(false);
+  const overrides = {
+    grants: session?.user?.permissionGrants ?? [],
+    revokes: session?.user?.permissionRevokes ?? [],
+  };
 
   return (
     <aside
@@ -104,7 +108,8 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-2 space-y-1">
         {NAV_ITEMS.map((item) => {
-          if (item.permission && !hasPermission(userRoles, item.permission)) return null;
+          if (item.permission && !hasPermission(userRoles, item.permission, overrides)) return null;
+          if (item.anyPermission && !hasAnyPermission(userRoles, item.anyPermission, overrides)) return null;
 
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
 

@@ -6,11 +6,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute } from "@/lib/utils/permissions";
+import {
+  getPermissionOverrides,
+  guardRoute,
+  sanitiseText,
+} from "@/lib/utils/permissions";
 import { RecordPaymentSchema } from "@/lib/validations/invoice";
 import { NotificationService } from "@/lib/services/NotificationService";
 import { formatINR, toNumber } from "@/lib/utils/currency";
-import { sanitiseText } from "@/lib/utils/permissions";
 
 type RouteContext = { params: { id: string } };
 
@@ -43,7 +46,11 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "payment:record");
+    const guard = guardRoute(
+      session.user.roles,
+      "payment:record",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const body = await req.json();

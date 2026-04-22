@@ -9,7 +9,12 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { EmailService } from "@/lib/services/EmailService";
-import { guardRoute } from "@/lib/utils/permissions";
+import {
+  forbidden,
+  getPermissionOverrides,
+  guardRoute,
+} from "@/lib/utils/permissions";
+import { hasPermission } from "@/lib/rbac";
 
 type RouteContext = { params: { id: string } };
 
@@ -94,7 +99,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "team:manage");
+    const overrides = getPermissionOverrides(session.user);
+    const guard = guardRoute(session.user.roles, "team:manage", overrides);
     if (guard) return guard;
 
     const body = await req.json();
@@ -125,6 +131,16 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     }
 
     const data = parsed.data;
+    const isAccessEdit =
+      data.isActive !== undefined ||
+      data.password !== undefined ||
+      data.pin !== undefined ||
+      data.sendInvite !== undefined;
+
+    if (isAccessEdit && !hasPermission(session.user.roles, "team:edit_access", overrides)) {
+      return forbidden();
+    }
+
     const passwordHash = data.password ? await bcrypt.hash(data.password, 12) : undefined;
     const pinHash = data.pin ? await bcrypt.hash(data.pin, 12) : undefined;
 
@@ -190,9 +206,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       return engineer;
     });
 
+    let inviteEmailSent: boolean | null = null;
+
     if (data.sendInvite && updated.user.isActive) {
       const baseUrl = process.env.APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-      await EmailService.sendTeamInvite({
+      inviteEmailSent = await EmailService.sendTeamInvite({
         to: updated.user.email,
         name: updated.user.name,
         division: updated.division,
@@ -204,7 +222,15 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       });
     }
 
-    return NextResponse.json({ success: true, data: updated });
+    return NextResponse.json({
+      success: true,
+      data: updated,
+      inviteEmailSent,
+      warnings:
+        inviteEmailSent === false
+          ? ["Engineer updated, but the invite email could not be sent."]
+          : [],
+    });
   } catch (error) {
     console.error("[PATCH /api/engineers/:id]", error);
 

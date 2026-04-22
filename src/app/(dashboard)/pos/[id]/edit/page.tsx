@@ -25,7 +25,7 @@ const schema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "Expiry date is required"),
   expectedWorkingDays: z.coerce.number().int().positive("Working days must be positive"),
-  assignedPMId: z.string().min(1, "Project manager is required"),
+  assignedPMId: z.string().min(1, "Business manager is required"),
   paymentTerms: z.enum(["NET_30", "NET_45", "CUSTOM"]).default("NET_30"),
   customPaymentDays: z.coerce.number().int().positive().optional(),
   division: z.enum(["TS", "LSS"]),
@@ -79,9 +79,9 @@ export default function EditPOPage() {
   });
 
   const { data: managers = [] } = useQuery<UserOption[]>({
-    queryKey: ["project-managers"],
+    queryKey: ["business-managers"],
     queryFn: async () => {
-      const res = await fetch("/api/users?role=PROJECT_MANAGER", { cache: "no-store" });
+      const res = await fetch("/api/users?role=BUSINESS_MANAGER", { cache: "no-store" });
       if (!res.ok) return [];
       const json = await res.json().catch(() => null);
       return Array.isArray(json?.data) ? (json.data as UserOption[]) : [];
@@ -241,9 +241,9 @@ export default function EditPOPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="assignedPMId">Assigned PM</Label>
+              <Label htmlFor="assignedPMId">Assigned Business Manager</Label>
               <select id="assignedPMId" className={selectClasses} {...register("assignedPMId")}>
-                <option value="">Select PM...</option>
+                <option value="">Select business manager...</option>
                 {managers.map((manager) => (
                   <option key={manager.id} value={manager.id}>
                     {manager.name}

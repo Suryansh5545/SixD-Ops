@@ -5,7 +5,8 @@
  *  1. Email + password (all roles)
  *  2. 6-digit PIN (field engineers, optimised for mobile plant-floor use)
  *
- * JWT session stores: id, name, email, role, roles, isActive
+ * JWT session stores: id, name, email, role, roles, permissionGrants,
+ * permissionRevokes, isActive
  * Session expiry: SESSION_EXPIRY_HOURS env var (default: 8h)
  */
 
@@ -69,6 +70,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           role: user.role,
           roles: user.roles,
+          permissionGrants: user.permissionGrants,
+          permissionRevokes: user.permissionRevokes,
           isActive: user.isActive,
         };
       },
@@ -84,6 +87,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.role = (user as { role: Role }).role;
         token.roles = (user as { roles: Role[] }).roles;
+        token.permissionGrants = (user as { permissionGrants: string[] }).permissionGrants;
+        token.permissionRevokes = (user as { permissionRevokes: string[] }).permissionRevokes;
         token.isActive = (user as { isActive: boolean }).isActive;
       }
       return token;
@@ -97,6 +102,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.id as string;
         session.user.role = token.role as Role;
         session.user.roles = token.roles as Role[];
+        session.user.permissionGrants = (token.permissionGrants as string[]) ?? [];
+        session.user.permissionRevokes = (token.permissionRevokes as string[]) ?? [];
         session.user.isActive = token.isActive as boolean;
       }
       return session;

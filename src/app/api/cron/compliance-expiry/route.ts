@@ -58,15 +58,16 @@ export async function GET(req: NextRequest) {
 
       // Find BMs for this client + MD
       const md = await prisma.user.findMany({
-        where: { role: "MD", isActive: true },
+        where: {
+          OR: [{ role: "MD" }, { roles: { has: "MD" } }],
+          isActive: true,
+        },
         select: { id: true, email: true },
       });
 
       const bms = await prisma.user.findMany({
         where: {
-          role: {
-            in: ["BUSINESS_MANAGER_STEEL", "BUSINESS_MANAGER_TATA_GOVT"],
-          },
+          OR: [{ role: "BUSINESS_MANAGER" }, { roles: { has: "BUSINESS_MANAGER" } }],
           isActive: true,
         },
         select: { id: true, email: true },
@@ -135,9 +136,12 @@ async function checkPOExpiry() {
     });
 
     for (const po of expiringPOs) {
-      // Notify PM + BH
+      // Notify the assigned business manager and business head
       const bh = await prisma.user.findMany({
-        where: { role: "BUSINESS_HEAD", isActive: true },
+        where: {
+          OR: [{ role: "BUSINESS_HEAD" }, { roles: { has: "BUSINESS_HEAD" } }],
+          isActive: true,
+        },
         select: { id: true },
       });
 

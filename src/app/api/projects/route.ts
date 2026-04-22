@@ -6,7 +6,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
-import { guardRoute, sanitiseText } from "@/lib/utils/permissions";
+import {
+  getPermissionOverrides,
+  guardRoute,
+  sanitiseText,
+} from "@/lib/utils/permissions";
 import { CreateProjectSchema } from "@/lib/validations/project";
 import { hasPermission } from "@/lib/rbac";
 
@@ -26,8 +30,9 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search");
     const skip = (page - 1) * limit;
 
-    const canViewAll = hasPermission(session.user.roles, "project:view_all");
-    const canViewOwn = hasPermission(session.user.roles, "project:view_own");
+    const overrides = getPermissionOverrides(session.user);
+    const canViewAll = hasPermission(session.user.roles, "project:view_all", overrides);
+    const canViewOwn = hasPermission(session.user.roles, "project:view_own", overrides);
 
     // Engineers only see projects they're deployed to
     const isFieldEngineer = session.user.roles.includes("FIELD_ENGINEER" as import("@prisma/client").Role);
@@ -36,7 +41,7 @@ export async function GET(req: NextRequest) {
       ...(status ? { status: status as import("@prisma/client").ProjectStatus } : {}),
       ...(clientId ? { clientId } : {}),
       ...(pmId ? { pmId } : {}),
-      // PM sees only their projects; BM sees sector-scoped; engineer sees deployed projects
+      // Business managers see only their projects; engineers see deployed projects.
       ...(!canViewAll && canViewOwn ? { pmId: session.user.id } : {}),
       ...(isFieldEngineer
         ? {
@@ -109,7 +114,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorised" }, { status: 401 });
     }
 
-    const guard = guardRoute(session.user.roles, "project:create");
+    const guard = guardRoute(
+      session.user.roles,
+      "project:create",
+      getPermissionOverrides(session.user)
+    );
     if (guard) return guard;
 
     const body = await req.json();
